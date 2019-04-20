@@ -73,7 +73,7 @@ bbox = get_sf_wgs_bounds(sf_fn)
 landsat_scene_directory = _d['landsat_scene_directory']
 wrs_blacklist = _d.get('wrs_blacklist', None)
 
-sf_feature_properties_key = _d.get('wrs_blacklist', 'key')
+sf_feature_properties_key = _d.get('sf_feature_properties_key', 'key')
 
 out_dir = _d['out_dir']
 
