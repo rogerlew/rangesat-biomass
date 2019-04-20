@@ -102,6 +102,15 @@ class LandSatScene(object):
         bqa = np.unpackbits(pixel_qa.view(np.uint8)).reshape((m, n, 16))
         self.bqa = np.concatenate((bqa[:, :, 8:], bqa[:, :, :8]), axis=2)
 
+    @property
+    def cellsize(self):
+        gt = self._d['pixel_qa'].transform
+        px_x = gt[0]
+        px_y = -gt[4]
+
+        assert px_x == px_y
+        return px_x
+
     def summary_dict(self):
         return dict(product_id=self.product_id, satellite=self.satellite,
                     acquisition_date=self.acquisition_date, wrs=self.wrs,
