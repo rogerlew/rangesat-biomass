@@ -293,8 +293,8 @@ if __name__ == '__main__':
     random.shuffle(fns)
 
     # run the model
-    p = multiprocessing.Pool(multiprocessing.cpu_count())
-    results = p.map(process_scene, fns)
+    pool = multiprocessing.Pool(multiprocessing.cpu_count())
+    results = pool.map(process_scene, fns)
     sf.close()
 
     # export the results
