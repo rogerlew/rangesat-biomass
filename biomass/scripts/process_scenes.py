@@ -1,4 +1,3 @@
-
 import sys
 import yaml
 import os
@@ -57,7 +56,7 @@ def get_sf_wgs_bounds(_sf_fn):
     return e, s, w, n
 
 
-def process_scene(scn_fn, verbose=True, cellsize=30):
+def process_scene(scn_fn, verbose=True):
     global models, out_dir, sf, bbox, sf_feature_properties_key
 
     if verbose:
@@ -81,9 +80,38 @@ def process_scene(scn_fn, verbose=True, cellsize=30):
     return dict(res=res, ls_summary=ls_summary)
 
 
+def dump_pasture_stats(results, dst_fn):
+    with open(dst_fn, 'w', newline='') as _fp:
+        fieldnames = ['product_id', 'key', 'total_px', 'snow_px', 'water_px',
+                      'aerosol_px', 'valid_px', 'coverage', 'area_ha',
+                      'model', 'biomass_mean_gpm', 'biomass_ci90_gpm',
+                      'biomass_10pct_gpm', 'biomass_75pct_gpm', 'biomass_90pct_gpm',
+                      'biomass_total_kg', 'biomass_sd_gpm', 'summer_vi_mean_gpm',
+                      'fall_vi_mean_gpm', 'fraction_summer',
+                      'product_id', 'satellite', 'acquisition_date',
+                      'wrs', 'bounds', 'valid_pastures_cnt']
+
+        writer = csv.DictWriter(_fp, fieldnames=fieldnames)
+        writer.writeheader()
+        for _res_d in results:  # scene
+            _res = _res_d['res']
+            _ls_summary = _res_d['ls_summary']
+
+            for _pasture in _res:  # pasture
+                _model_stats = _pasture['model_stats']
+                del _pasture['model_stats']
+
+                for _model, _model_d in _model_stats.items():
+                    _model_d = _model_d.asdict()
+                    _model_d.update(_pasture)
+                    _model_d.update(_ls_summary)
+                    writer.writerow(_model_d)
+
 #
 # INITIALIZE GLOBAL VARIABLES
 #
+# This variables need to be in the global scope so that they
+# work with multiprocessing.
 
 
 cfg_fn = sys.argv[-1]
@@ -131,37 +159,9 @@ if __name__ == '__main__':
 
     # run the model
     pool = multiprocessing.Pool(multiprocessing.cpu_count())
-    results = pool.map(process_scene, fns)
+    _results = pool.map(process_scene, fns)
     sf.close()
 
-    # export the results
-    fp = open(_join(out_dir, 'pasture_stats.csv'), 'w', newline='')
-
-    fieldnames = ['product_id', 'key', 'total_px', 'snow_px', 'water_px',
-                  'aerosol_px', 'valid_px', 'coverage', 'area_ha',
-                  'model', 'biomass_mean_gpm', 'biomass_ci90_gpm',
-                  'biomass_10pct_gpm', 'biomass_75pct_gpm', 'biomass_90pct_gpm',
-                  'biomass_total_kg', 'biomass_sd_gpm', 'summer_vi_mean_gpm',
-                  'fall_vi_mean_gpm', 'fraction_summer',
-                  'product_id', 'satellite', 'acquisition_date',
-                  'wrs', 'bounds', 'valid_pastures_cnt']
-
-    writer = csv.DictWriter(fp, fieldnames=fieldnames)
-    writer.writeheader()
-    for _res_d in results:  # scene
-        _res = _res_d['res']
-        _ls_summary = _res_d['ls_summary']
-
-        for _pasture in _res:  # pasture
-            _model_stats = _pasture['model_stats']
-            del _pasture['model_stats']
-
-            for _model, _model_d in _model_stats.items():
-                _model_d = _model_d.asdict()
-                _model_d.update(_pasture)
-                _model_d.update(_ls_summary)
-                writer.writerow(_model_d)
-
-    fp.close()
+    dump_pasture_stats(_results, _join(out_dir, 'pasture_stats.csv'))
 
     print('processed %i scenes in %f seconds' % (len(fns), time() - t0))
