@@ -144,7 +144,7 @@ if __name__ == '__main__':
                   'biomass_total_kg', 'biomass_sd_gpm', 'summer_vi_mean_gpm',
                   'fall_vi_mean_gpm', 'fraction_summer',
                   'product_id', 'satellite', 'acquisition_date',
-                  'wrs', 'bounds', 'valid_pastures']
+                  'wrs', 'bounds', 'valid_pastures_cnt']
 
     writer = csv.DictWriter(fp, fieldnames=fieldnames)
     writer.writeheader()
