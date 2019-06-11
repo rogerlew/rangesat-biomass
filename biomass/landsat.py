@@ -32,6 +32,8 @@ class LandSatScene(object):
         if not _exists(fn):
             raise OSError
 
+        self.tar = None
+
         if os.path.isdir(fn):
             self.__open_dir(fn)
             self.isdir = True
@@ -67,40 +69,71 @@ class LandSatScene(object):
         self.fn = fn
         self._d = d
 
+    def __del__(self):
+        for key, ds in self._d.items():
+            try:
+                ds.close()
+            except:
+                pass
+
     def __open_targz(self, fn):
         assert fn.endswith('.tar.gz')
 
         # Open tarfile
         tar = tarfile.open(fn)
 
-        d = {}
         product_id = None
         for member in tar.getnames():
+            print(member)
+            if member.endswith('.tif'):
+                product_id = '_'.join(_split(member)[-1].split('_')[:7])
+                break
+
+        d = {}
+        for member in tar.getnames():
+            print(member)
+            key = _split(member)[-1].replace('%s_' % product_id, '')\
+                                    .replace('.tif', '')
+
             if member.endswith('.xml'):
-                product_id = _split(member)[-1].replace('.xml', '')
                 d['.xml'] = tar.extractfile(member).read()
             elif member.endswith('.tif'):
-                data = io.BytesIO(tar.extractfile(member).read())
-                d[member.replace('.tif', '')] = MemoryFile(data).open()
+                d[key] = member
 
-        for k in d:
-            d[k.replace(product_id, '')] = d.pop(k)
-
-        tar.close()
-
+        self.tar = tar
         self.product_id = product_id
         self.fn = fn
         self._d = d
+
+    def __del__(self):
+        if self.tar is not None:
+            self.tar.close()
+
+    def get_dataset(self, name):
+        if name not in self._d:
+            raise KeyError
+
+        if self.tar is not None:
+            fn = '{}_{}.tif'.format(self.product_id, name)
+            data = io.BytesIO(self.tar.extractfile(fn).read())
+            return MemoryFile(data).open()
+
+        return self._d[name]
 
     def _build_bqa(self):
         # the np.unpackbits only works with uint8 data types. The pixel_qa band is uint16
         # the 9th and 10th bits are used to encode the cirrus confidence. This ends up
         # dropping those bits for the sake of performance
 
+        ds = self.get_dataset('pixel_qa')
+        print(ds.read(1))
         pixel_qa = np.array(self._d['pixel_qa'].read(1), dtype=np.uint16)
+        print(pixel_qa.shape)
         m, n = pixel_qa.shape
         bqa = np.unpackbits(pixel_qa.view(np.uint8)).reshape((m, n, 16))
         self.bqa = np.concatenate((bqa[:, :, 8:], bqa[:, :, :8]), axis=2)
+
+        print('pixel as done')
 
     @property
     def cellsize(self):
@@ -350,7 +383,7 @@ class LandSatScene(object):
         """
         return self._d['pixel_qa']
 
-    def dump(self, data, dst_fn, nodata=-9999):
+    def dump(self, data, dst_fn, nodata=-9999, dtype=rasterio.float32):
         """
         utility method to export arrays
         with the same projection and size as the
@@ -393,7 +426,8 @@ class LandSatScene(object):
             shutil.rmtree(outdir)
         os.makedirs(outdir)
 
-        for measure, src in self._d.items():
+        for measure in self._d:
+            src = self.get_dataset(measure)
             if '.xml' in measure:
                 dst_fn = _join(outdir, '%s_%s' % (self.product_id, measure))
                 with open(dst_fn, 'w') as fp:
