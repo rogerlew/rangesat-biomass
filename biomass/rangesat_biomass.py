@@ -9,6 +9,7 @@ from math import sqrt
 from os.path import join as _join
 from os.path import exists as _exists
 
+import rasterio
 from rasterio.mask import raster_geometry_mask
 
 import numpy as np
@@ -128,7 +129,7 @@ class BiomassModel(object):
         self.biomass = biomass
         self.models = models
 
-    def export_grids(self, biomass_dir):
+    def export_grids(self, biomass_dir, dtype=rasterio.int16):
         """
         Export the grids to a "biomass" subdirectory of the cropped landsat scene.
 
@@ -144,13 +145,16 @@ class BiomassModel(object):
             os.makedirs(biomass_dir)
 
         for name, data in biomass.items():
-            ls.dump(data, _join(biomass_dir, '%s_biomass.tif' % name))
+            data = np.array(np.round(data), dtype=dtype)
+            ls.dump(data, _join(biomass_dir, '%s_biomass.tif' % name), dtype=dtype)
 
         for name, data in fall_vi.items():
-            ls.dump(data, _join(biomass_dir, '%s_fall_vi.tif' % name))
+            data = np.array(np.round(data), dtype=dtype)
+            ls.dump(data, _join(biomass_dir, '%s_fall_vi.tif' % name), dtype=dtype)
 
         for name, data in summer_vi.items():
-            ls.dump(data, _join(biomass_dir, '%s_summer_vi.tif' % name))
+            data = np.array(np.round(data), dtype=dtype)
+            ls.dump(data, _join(biomass_dir, '%s_summer_vi.tif' % name), dtype=dtype)
 
     def analyze_pastures(self, sf, sf_feature_properties_key):
         """
