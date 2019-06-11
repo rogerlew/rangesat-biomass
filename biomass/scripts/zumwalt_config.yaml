@@ -20,6 +20,14 @@ models:
             fall_slp: 1042.00
             required_coverage: 0.5
             minimum_area_ha: 1.8
+          - satellite: 7
+            ndvi_threshold: 0.32
+            summer_int: 104.06
+            summer_slp: 343.18
+            fall_int: -56.45
+            fall_slp: 1042.00
+            required_coverage: 0.5
+            minimum_area_ha: 1.8
 
 # shapefile containing pastures to analyze
 sf_fn:   C:\Users\roger\Documents\Zumwalt\vector_data\Pastures_ForageAreas_2018_AllZumClip.shp

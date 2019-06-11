@@ -5,6 +5,7 @@ import shutil
 import multiprocessing
 import csv
 import random
+import tarfile
 
 from glob import glob
 from time import time
@@ -14,57 +15,49 @@ from os.path import exists as _exists
 from os.path import split as _split
 
 import fiona
-import pyproj
-
-from osgeo import osr
-import numpy as np
+import rasterio
 
 sys.path.append(os.path.abspath('../../'))
 from biomass.landsat import LandSatScene
 from biomass.rangesat_biomass import ModelPars, SatModelPars, BiomassModel
+from biomass.all__your_base import get_sf_wgs_bounds
 
 
-def wkt_2_proj4(wkt):
-    srs = osr.SpatialReference()
-    srs.ImportFromWkt(wkt)
-    return srs.ExportToProj4().strip()
-
-
-wgs84_proj4 = '+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs'
-
-
-def get_sf_wgs_bounds(_sf_fn):
-    """
-    returns the bbox of the features in a fiona.shapefile
-    """
-    _sf = fiona.open(_sf_fn, 'r')
-    bboxs = []
-    for feature in _sf:
-        bboxs.append(fiona.bounds(feature))
-
-    bboxs = np.array(bboxs)
-    e, s, w, n = [np.min(bboxs[:, 0]), np.min(bboxs[:, 1]),
-                  np.max(bboxs[:, 2]), np.max(bboxs[:, 3])]
-
-    proj_wkt = open(_sf_fn.replace('.shp', '') + '.prj').read()
-    sf_proj4 = wkt_2_proj4(proj_wkt)
-    sf_proj = pyproj.Proj(sf_proj4)
-    wgs_proj = pyproj.Proj(wgs84_proj4)
-    e, s = pyproj.transform(sf_proj, wgs_proj, e, s)
-    w, n = pyproj.transform(sf_proj, wgs_proj, w, n)
-
-    return e, s, w, n
+def extract(tar_fn, dst):
+    tar = tarfile.open(tar_fn)
+    tar.extractall(path=dst)
+    tar.close()
 
 
 def process_scene(scn_fn, verbose=True):
     global models, out_dir, sf, bbox, sf_feature_properties_key
 
+    assert '.tar.gz' in scn_fn
     if verbose:
         print(scn_fn, out_dir)
 
-    # Load and crop LandSat Scene
-    ls = LandSatScene(scn_fn).clip(bbox, out_dir)
+    print('extracting...')
+    scn_path = scn_fn.replace('.tar.gz', '')
+    extract(scn_fn, scn_path)
 
+    # Load and crop LandSat Scene
+    print('load')
+    _ls = LandSatScene(scn_path)
+
+    print('clip')
+    try:
+        ls =_ls.clip(bbox, out_dir)
+    except rasterio.errors.WindowError:
+        try:
+            del _ls
+            del ls
+            print('cleaning up extracted scene')
+            shutil.rmtree(scn_path)
+            return None
+        except:
+            return None
+
+    print('ls.basedir', ls.basedir)
     # Build biomass model
     bio_model = BiomassModel(ls, models)
 
@@ -76,6 +69,14 @@ def process_scene(scn_fn, verbose=True):
 
     # get a summary dictionary of the landsat scene
     ls_summary = ls.summary_dict()
+
+    try:
+        del _ls
+        del ls
+        print('cleaning up extracted scene')
+        shutil.rmtree(scn_path)
+    except:
+        pass
 
     return dict(res=res, ls_summary=ls_summary)
 
@@ -128,7 +129,7 @@ for _m in _models:
         _satellite_pars[pars['satellite']] = SatModelPars(**pars)
     models.append(ModelPars(_m['name'], _satellite_pars))
 
-# open shape file and determine the
+# open shape file and determine the bounds
 sf_fn = _d['sf_fn']
 sf_fn = os.path.abspath(sf_fn)
 sf = fiona.open(sf_fn, 'r')
@@ -143,25 +144,31 @@ out_dir = _d['out_dir']
 
 if __name__ == '__main__':
     t0 = time()
-
+    use_multiprocessing = False
     if _exists(out_dir):
         shutil.rmtree(out_dir)
 
     os.makedirs(out_dir)
 
     # find all the scenes
-    fns = glob(_join(landsat_scene_directory, '*'))
-    fns = [fn for fn in fns if os.path.isdir(fn) and _split(fn)[-1].startswith('L')]
+    fns = glob(_join(landsat_scene_directory, '*.tar.gz'))
+    #fns = [fn for fn in fns if os.path.isdir(fn) and _split(fn)[-1].startswith('L')]
     if wrs_blacklist is not None:
-        fns = [fn for fn in fns if os.path.isdir(fn) and _split(fn)[-1][4:10] not in wrs_blacklist]
+        fns = [fn for fn in fns if _split(fn)[-1][4:10] not in wrs_blacklist]
 
     random.shuffle(fns)
 
-    # run the model
-    pool = multiprocessing.Pool(multiprocessing.cpu_count())
-    _results = pool.map(process_scene, fns)
-    sf.close()
+    if use_multiprocessing:
+        # run the model
+        pool = multiprocessing.Pool(multiprocessing.cpu_count())
+        _results = pool.map(process_scene, fns)
+        sf.close()
+    else:
+        _results = []
+        for fn in fns[:5]:
+            _results.append(process_scene(fn))
 
+    _results = [res for res in _results if res is not None]
     dump_pasture_stats(_results, _join(out_dir, 'pasture_stats.csv'))
 
     print('processed %i scenes in %f seconds' % (len(fns), time() - t0))
