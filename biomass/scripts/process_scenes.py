@@ -20,7 +20,7 @@ import rasterio
 sys.path.append(os.path.abspath('../../'))
 from biomass.landsat import LandSatScene
 from biomass.rangesat_biomass import ModelPars, SatModelPars, BiomassModel
-from biomass.all__your_base import get_sf_wgs_bounds
+from all_your_base import get_sf_wgs_bounds
 
 
 def extract(tar_fn, dst):

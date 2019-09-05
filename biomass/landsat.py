@@ -125,15 +125,11 @@ class LandSatScene(object):
         # the 9th and 10th bits are used to encode the cirrus confidence. This ends up
         # dropping those bits for the sake of performance
 
-        ds = self.get_dataset('pixel_qa')
-        print(ds.read(1))
+        # ds = self.get_dataset('pixel_qa')
         pixel_qa = np.array(self._d['pixel_qa'].read(1), dtype=np.uint16)
-        print(pixel_qa.shape)
         m, n = pixel_qa.shape
         bqa = np.unpackbits(pixel_qa.view(np.uint8)).reshape((m, n, 16))
         self.bqa = np.concatenate((bqa[:, :, 8:], bqa[:, :, :8]), axis=2)
-
-        print('pixel as done')
 
     @property
     def cellsize(self):
