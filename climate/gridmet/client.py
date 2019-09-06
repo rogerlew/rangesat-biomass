@@ -4,7 +4,8 @@ import requests
 import shutil
 from enum import Enum
 from os.path import join as _join
-from os.path import exists
+from os.path import split as _split
+from os.path import exists, dirname
 
 import json
 
@@ -82,7 +83,16 @@ def _retrieve(gridvariable: GridMetVariable, bbox, year):
     return id
 
 
-def retrieve_timeseries(variables, locations, start_year, end_year):
+def dump(abbrv, year, key, ts, desc, units, met_dir):
+    pasture, ranch = key
+    fn = _join(met_dir, ranch, pasture, str(year), '%s.npy' % abbrv)
+    os.makedirs(dirname(fn), exist_ok=True)
+
+    with open(fn, 'wb') as fp:
+        np.save(fp, ts)
+
+
+def retrieve_timeseries(variables, locations, start_year, end_year, met_dir):
     global _var_meta
 
     lons = [loc[0] for loc in locations.values()]
@@ -98,7 +108,7 @@ def retrieve_timeseries(variables, locations, start_year, end_year):
 
     assert start_year <= end_year
 
-    d = {}
+    #d = {}
     for gridvariable in variables:
         for year in range(start_year, end_year + 1):
             print('acquiring', gridvariable, year, bbox)
@@ -115,17 +125,22 @@ def retrieve_timeseries(variables, locations, start_year, end_year):
 
             if _d is None:
                 for key in locations:
+                    dump(abbrv, year, key, ts, desc, units, met_dir)
                     lon, lat = locations[key]
-                    d[(abbrv, year, key)] = (None, desc, units)
+                    #d['{}-{}-{}'.format(abbrv, year, key)] = (None, desc, units)
             else:
                 for key, ts in _d.items():
-                    d[(abbrv, year, key)] = (ts, desc, units)
+                    dump(abbrv, year, key, ts, desc, units, met_dir)
+                    #ts = [int(x) for x in ts]
+                    #d['{}-{}-{}'.format(abbrv, year, key)] = (ts, desc, units)
 
-    return d
+    #return d
 
 
 if __name__ == "__main__":
     from app import RANGESAT_DIR, Location
+    import os
+
     location = 'Zumwalt'
 
     loc_path = _join(RANGESAT_DIR, location)
@@ -142,15 +157,20 @@ if __name__ == "__main__":
             for pasture in pastures:
                 print(pasture, ranch)
                 _pasture = _location.serialized_pasture(ranch, pasture)
-                geo_locations['%s+%s' % (pasture, ranch)] = _pasture['centroid']
+                ranch = ranch.replace("'", "~").replace(' ', '_')
+                pasture = pasture.replace("'", "~").replace(' ', '_')
+                geo_locations[(pasture, ranch)] = _pasture['centroid']
 
     start_year = 1979
     end_year = 2019
 
+    met_dir = _join(_location.loc_path, 'gridmet')
+    print(met_dir)
+
+    if exists(met_dir):
+        shutil.rmtree(met_dir)
+
+    os.mkdir(met_dir)
     d = retrieve_timeseries([var for var in GridMetVariable],
-                            geo_locations, start_year, end_year)
+                            geo_locations, start_year, end_year, met_dir)
 
-    with open('%s.json' % location, 'w') as fp:
-        json.dump(d, fp)
-
-    print(d)

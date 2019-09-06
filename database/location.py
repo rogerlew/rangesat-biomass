@@ -9,6 +9,9 @@ import pyproj
 import numpy as np
 import json
 
+import rasterio
+from rasterio.mask import raster_geometry_mask
+
 from osgeo import osr
 
 
@@ -23,8 +26,6 @@ wgs84_proj4 = '+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs'
 
 class Location(object):
     def __init__(self, loc_path):
-        print('loc_path', loc_path)
-        print(_join(loc_path, '*.yaml'))
         cfg_fn = glob(_join(loc_path, '*.yaml'))
         assert len(cfg_fn) == 1, cfg_fn
         cfg_fn = cfg_fn[0]
@@ -81,6 +82,32 @@ class Location(object):
         d = dict(location=self.location, models=self.models, ranches=self.ranches,
                  area_ha=area_ha, bbox=bbox)
         return d
+
+    def extract_pixels(self, raster_fn, ranch=None, pasture=None):
+        loc_path = self.loc_path
+        _d = self._d
+
+        sf_fn = _join(loc_path, _d['sf_fn'])
+        sf_feature_properties_key = _d['sf_feature_properties_key']
+        sf_fn = os.path.abspath(sf_fn)
+        sf = fiona.open(sf_fn, 'r')
+
+        features = []
+        for feature in sf:
+            properties = feature['properties']
+            key = properties[sf_feature_properties_key].replace(' ', '_')
+
+            _pasture, _ranch = key.split('+')
+
+            if _pasture.lower() == pasture.lower() and _ranch.lower() == ranch.lower():
+                features.append(feature['geometry'])
+
+        ds = rasterio.open(raster_fn)
+        data = ds.read(1, masked=True)
+        pasture_mask, _, _ = raster_geometry_mask(ds, features)
+
+        x = data[np.logical_not(pasture_mask)]
+        return [float(x) for x in x[x.mask == False]]
 
     def shape_inspection(self, ranch=None):
         loc_path = self.loc_path
