@@ -20,13 +20,23 @@ import rasterio
 sys.path.append(os.path.abspath('../../'))
 from biomass.landsat import LandSatScene
 from biomass.rangesat_biomass import ModelPars, SatModelPars, BiomassModel
-from biomass.all__your_base import get_sf_wgs_bounds
+from all_your_base import get_sf_wgs_bounds
 import subprocess
 
+
 def process_scene(scn_fn):
-    p = subprocess.Popen(['C:\python37x64\python.exe', 'process_scene.py', cfg_fn, scn_fn], stderr=subprocess.PIPE, stdout=subprocess.PIPE)
+    p = subprocess.Popen(['python3', 'process_scene.py', cfg_fn, scn_fn],
+                         stderr=subprocess.PIPE, stdout=subprocess.PIPE)
     p.wait()
     shutil.rmtree(scn_fn.replace('.tar.gz', ''))
+
+
+def is_processed(fn):
+    global out_dir
+    _fn = _split(fn)[-1].split('-')[0]
+    res = glob(_join(out_dir, '{}_*_{}_{}_*_{}_{}'
+               .format(_fn[:4], _fn[4:10], _fn[10:18], _fn[18:20], _fn[20:22])))
+    return len(res) > 0
 
 #
 # INITIALIZE GLOBAL VARIABLES
@@ -64,11 +74,11 @@ out_dir = _d['out_dir']
 
 if __name__ == '__main__':
     t0 = time()
-    use_multiprocessing = True
-    if _exists(out_dir):
-        shutil.rmtree(out_dir)
+    use_multiprocessing = False
+#    if _exists(out_dir):
+#        shutil.rmtree(out_dir)
 
-    os.makedirs(out_dir)
+#    os.makedirs(out_dir)
 
     # find all the scenes
     fns = glob(_join(landsat_scene_directory, '*.tar.gz'))
@@ -76,7 +86,9 @@ if __name__ == '__main__':
     if wrs_blacklist is not None:
         fns = [fn for fn in fns if _split(fn)[-1][4:10] not in wrs_blacklist]
 
-    random.shuffle(fns)
+    fns = [fn for fn in fns if not is_processed(fn)]
+
+#    random.shuffle(fns)
 
     if use_multiprocessing:
         # run the model

@@ -129,7 +129,7 @@ class BiomassModel(object):
         self.biomass = biomass
         self.models = models
 
-    def export_grids(self, biomass_dir, dtype=rasterio.int16):
+    def export_grids(self, biomass_dir, dtype=rasterio.float32):
         """
         Export the grids to a "biomass" subdirectory of the cropped landsat scene.
 
