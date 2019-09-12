@@ -143,7 +143,7 @@ class LandSatScene(object):
     def summary_dict(self):
         return dict(product_id=self.product_id, satellite=self.satellite,
                     acquisition_date=self.acquisition_date, wrs=self.wrs,
-                    bounds=self.bounds)
+                    bounds=self.bounds, wgs_bounds=self.wgs_bounds)
 
     @property
     def landsat(self):
@@ -171,7 +171,7 @@ class LandSatScene(object):
     @property
     def wgs_bounds(self):
         src = self._d['pixel_qa']
-        return transform_bounds(src.crs, 'epsg:4326', *self.bounds)
+        return transform_bounds(src.crs, 'EPSG:4326', *src.bounds)
 
     @property
     def acquisition_date(self):

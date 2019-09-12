@@ -1,6 +1,17 @@
-
-import os
 import sys
+
+sys.path.insert(0, '/var/www/rangesat-biomass')
+
+from datetime import datetime
+import os
+from os.path import join as _join
+from os.path import exists
+
+
+from api.app import RANGESAT_DIR, Location
+from climate.gridmet import retrieve_timeseries, GridMetVariable
+
+
 import json
 
 from os.path import split as _split
@@ -9,8 +20,6 @@ from os.path import join as _join
 from datetime import date
 from glob import glob
 
-
-from datetime import datetime
 from lsru import Espa, Usgs
 
 import fiona
@@ -77,6 +86,8 @@ def place_order(bbox,
     global catalog
 
     assert landsat_num in [4, 5, 7, 8]
+
+    print(bbox, t0, tend, landsat_num)
 
     if landsat_num == 4:
         collection = 'LANDSAT_TM_C1'
@@ -187,23 +198,31 @@ def build_catalog(directory):
 
     return catalog
 
-if __name__ == "__main__":
 
-    landsat_data_dir = "D:\Zumwalt\RS"
-    catalog = build_catalog(landsat_data_dir)
+landsat_data_dir = "/geodata/torch-landsat"
+catalog = build_catalog(landsat_data_dir)
+if len(catalog) <= 0:
+    raise Exception
 
-#    sf_fn = "D:\RCR\VectorData\RockCreekRanch_habitatmodeled.shp"
-    sf_fn = "D:\Zumwalt\VectorData\Zumwalt_AnalysisArea\Pastures_ForageAreas_2018_AllZumClip.shp"
+current_year = datetime.now().year
 
-    bbox = get_sf_wgs_bounds(sf_fn)
-    print(bbox)
+locations = ['Zumwalt']
 
-    y0 = 1990
-    yend = 2019
-    for landsat_num in [7, 8]:
+for location in locations:
+    loc_path = _join(RANGESAT_DIR, location)
+    assert exists(loc_path)
+
+    _location = Location(loc_path)
+    area_ha, bbox = _location.shape_inspection()
+
+    e, n, w, s = bbox
+    bbox = (e, s, w, n)
+
+    y0 = current_year
+    yend = current_year
+    for landsat_num in [8, 7]:
         for yr in range(y0, yend+1):
-            print(yr)
             place_order(bbox=bbox,
                         t0=datetime(yr, 1, 1),
-                        tend=datetime(yr, 12, 31),
+                        tend=datetime.now(),
                         landsat_num=landsat_num)

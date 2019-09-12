@@ -8,7 +8,8 @@ from os.path import isdir, exists
 from flask import Flask, jsonify, send_file, request
 from glob import glob
 from datetime import datetime, date
-
+import os
+import uuid
 import numpy as np
 
 from database import Location
@@ -37,6 +38,8 @@ else:
 
 RANGESAT_DIR = _join(GEODATA_DIR, 'rangesat')
 
+_thisdir = os.path.dirname(__file__)
+STATIC_DIR = _join(_thisdir, 'static')
 
 @app.route('/')
 def index():
@@ -187,7 +190,6 @@ def _scenemeta_location_intrayear(location, year, start_date, end_date):
 
 
 def _scenemeta_location_interyear(location, start_year, end_year, start_date, end_date):
-
     loc_path = _join(RANGESAT_DIR, location)
     if exists(loc_path):
         _location = Location(loc_path)
@@ -201,13 +203,14 @@ def _scenemeta_location_interyear(location, start_year, end_year, start_date, en
         end_year = int(end_year)
         mask = [start_year < d.year < end_year for d in dates]
 
-        for i, (d, m) in enumerate(zip(dates, mask)):
-            if not m:
-                continue
+        if start_date is not None and end_date is not None:
+            for i, (d, m) in enumerate(zip(dates, mask)):
+                if not m:
+                    continue
 
-            _start_date = date(*map(int, '{}-{}'.format(d.year, start_date).split('-')))
-            _end_date = date(*map(int, '{}-{}'.format(d.year, end_date).split('-')))
-            mask[i] = _start_date < d < _end_date
+                _start_date = date(*map(int, '{}-{}'.format(d.year, start_date).split('-')))
+                _end_date = date(*map(int, '{}-{}'.format(d.year, end_date).split('-')))
+                mask[i] = _start_date < d < _end_date
 
         fns = []
         for fn, m in zip(ls_fns, mask):
@@ -230,6 +233,22 @@ def _scenemeta_location_interyear(location, start_year, end_year, start_date, en
 @app.route('/scenemeta/<location>')
 @app.route('/scenemeta/<location>/')
 def scenemeta_location(location):
+    filter = request.args.get('filter', None)
+
+    if filter == 'latest':
+        return jsonify(_scenemeta_location_latest(location))
+    elif filter == 'inter-year':
+        start_year =request.args.get('start_year', None)
+        end_year = request.args.get('end_year', None)
+        start_date = request.args.get('start_date', None)
+        end_date = request.args.get('end_date', None)
+        return jsonify(_scenemeta_location_interyear(location, start_year, end_year, start_date, end_date))
+    elif filter == 'intra-year':
+        year =request.args.get('year', None)
+        start_date = request.args.get('start_date', None)
+        end_date = request.args.get('end_date', None)
+        return jsonify(_scenemeta_location_interyear(location, year, start_date, end_date))
+
     loc_path = _join(RANGESAT_DIR, location)
     if exists(loc_path):
         _location = Location(loc_path)
@@ -276,10 +295,10 @@ def raster(location, product_id, product):
 
     fn = []
     if product in ['ndvi', 'nbr', 'nbr2', 'pixel_qa']:
-        fn = glob(_join(out_dir, product_id, '*{}.tif'.format(product)))
+        fn = glob(_join(out_dir, product_id, '*{}.wgs.tif'.format(product)))
 
     elif product in ['biomass', 'fall_vi', 'summer_vi']:
-        fn = glob(_join(out_dir, product_id, 'biomass/*{}.tif'.format(product)))
+        fn = glob(_join(out_dir, product_id, 'biomass/*{}.wgs.tif'.format(product)))
 
     if len(fn) != 1:
         return jsonify(None)
@@ -551,3 +570,4 @@ def interyear_histogram(location, ranch, pasture):
 if __name__ == '__main__':
     app.run(debug=True)
 # rsync -av --progress --exclude temp rangesat-biomass/ rogerlew@rangesat.nkn.uidaho.edu:/var/www/rangesat-biomass
+# rsync -av --progress geodata/rangesat/ rogerlew@rangesat.nkn.uidaho.edu:/geodata/rangesat

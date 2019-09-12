@@ -3,13 +3,9 @@ import uuid
 import requests
 import shutil
 from enum import Enum
+import os
 from os.path import join as _join
-from os.path import split as _split
 from os.path import exists, dirname
-
-import json
-
-from pprint import pprint
 
 import numpy as np
 
@@ -138,7 +134,7 @@ def retrieve_timeseries(variables, locations, start_year, end_year, met_dir):
 
 
 if __name__ == "__main__":
-    from app import RANGESAT_DIR, Location
+    from api.app import RANGESAT_DIR, Location
     import os
 
     location = 'Zumwalt'
