@@ -88,6 +88,7 @@ if __name__ == '__main__':
 
     fns = [fn for fn in fns if not is_processed(fn)]
 
+
 #    random.shuffle(fns)
 
     if use_multiprocessing:
@@ -96,7 +97,8 @@ if __name__ == '__main__':
         _results = pool.map(process_scene, fns)
     else:
         _results = []
-        for fn in fns[:5]:
+        for fn in fns:
+            print(fn)
             _results.append(process_scene(fn))
 
     sf.close()
