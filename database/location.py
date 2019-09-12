@@ -216,13 +216,13 @@ class Location(object):
                     pasture=pasture, area_ha=area_ha, centroid=centroid)
 
     def geojson_filter(self, ranch=None, pasture=None):
-        print(ranch, pasture)
         sf_feature_properties_key = self._d['sf_feature_properties_key']
 
         with open(self.geojson) as fp:
-            if ranch is None and pasture is None:
-                return fp.read()
             js = json.load(fp)
+
+        if ranch is None and pasture is None:
+            return js
 
         _features = []
         for f in js['features']:
@@ -235,5 +235,5 @@ class Location(object):
 
         js['features'] = _features
 
-        return json.dumps(js)
+        return js
 

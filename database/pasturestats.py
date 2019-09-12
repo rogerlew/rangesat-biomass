@@ -6,16 +6,17 @@ import csv
 from os.path import join as _join
 from os.path import exists as _exists
 import shutil
+import ast
 
 import numpy as np
 
 
 _header = ('product_id', 'key', 'pasture', 'ranch', 'total_px', 'snow_px', 
-                 'water_px', 'aerosol_px',
-                 'valid_px', 'coverage', 'model', 'biomass_mean_gpm', 'biomass_ci90_gpm',
-                 'biomass_10pct_gpm', 'biomass_75pct_gpm', 'biomass_90pct_gpm', 'biomass_total_kg',
-                 'biomass_sd_gpm', 'summer_vi_mean_gpm', 'fall_vi_mean_gpm', 'fraction_summer',
-                 'satellite', 'acquisition_date', 'wrs', 'bounds', 'valid_pastures_cnt')
+           'water_px', 'aerosol_px',
+           'valid_px', 'coverage', 'model', 'biomass_mean_gpm', 'biomass_ci90_gpm',
+           'biomass_10pct_gpm', 'biomass_75pct_gpm', 'biomass_90pct_gpm', 'biomass_total_kg',
+           'biomass_sd_gpm', 'summer_vi_mean_gpm', 'fall_vi_mean_gpm', 'fraction_summer',
+           'satellite', 'acquisition_date')
 
 _measures = ('biomass_mean_gpm', 'biomass_ci90_gpm',
              'biomass_10pct_gpm', 'biomass_75pct_gpm', 'biomass_90pct_gpm', 'biomass_total_kg',
@@ -50,7 +51,9 @@ def query_pasture_stats(db_fn, ranch=None, acquisition_date=None, pasture=None):
     conn = sqlite3.connect(db_fn)
     c = conn.cursor()
 
-    query = 'SELECT * FROM pasture_stats'
+    query = 'SELECT ' + \
+            ', '.join(_header) + \
+            ' FROM pasture_stats'
 
     i = 0
     if ranch is not None or acquisition_date is not None or pasture is not None:
@@ -83,7 +86,9 @@ def query_intrayear_pasture_stats(db_fn, ranch=None, pasture=None, year=None,
     conn = sqlite3.connect(db_fn)
     c = conn.cursor()
 
-    query = 'SELECT * FROM pasture_stats'
+    query = 'SELECT ' + \
+            ', '.join(_header) + \
+            ' FROM pasture_stats'
 
     i = 0
     if ranch is not None or year is not None or pasture is not None:
@@ -136,7 +141,9 @@ def query_interyear_pasture_stats(db_fn, ranch=None, pasture=None, start_year=No
     conn = sqlite3.connect(db_fn)
     c = conn.cursor()
 
-    query = 'SELECT * FROM pasture_stats'
+    query = 'SELECT ' + \
+            ', '.join(_header) + \
+            ' FROM pasture_stats'
 
     i = 0
     if ranch is not None or pasture is not None:
@@ -191,7 +198,9 @@ def query_multiyear_pasture_stats(db_fn, ranch=None, pasture=None, start_year=No
     conn = sqlite3.connect(db_fn)
     c = conn.cursor()
 
-    query = 'SELECT * FROM pasture_stats'
+    query = 'SELECT ' + \
+            ', '.join(_header) + \
+            ' FROM pasture_stats'
 
     i = 0
     if ranch is not None or pasture is not None:
