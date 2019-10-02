@@ -5,16 +5,22 @@ from os.path import split as _split
 
 from os.path import isdir, exists
 
-from flask import Flask, jsonify, send_file, request
+from flask import Flask, jsonify, send_file, request, after_this_request
 from glob import glob
 from datetime import datetime, date
 import os
 import uuid
 import numpy as np
+from ast import literal_eval
+
+import fiona
+import rasterio
+from rasterio.mask import raster_geometry_mask
 
 from database import Location
 from database.pasturestats import (
     query_pasture_stats,
+    query_singleyear_pasture_stats,
     query_intrayear_pasture_stats,
     query_interyear_pasture_stats,
     query_multiyear_pasture_stats
@@ -76,6 +82,7 @@ def index():
 
 
 @app.route('/location')
+@app.route('/location/')
 def locations():
     queryset = glob('{}/*'.format(RANGESAT_DIR))
     queryset = [_split(loc)[-1] for loc in queryset if isdir(loc)]
@@ -153,7 +160,7 @@ def _scenemeta_location_latest(location):
     if exists(loc_path):
         _location = Location(loc_path)
         out_dir = _location.out_dir
-        ls_fns = glob(_join(out_dir, '*/*pixel_qa.tif'))
+        ls_fns = glob(_join(out_dir, '*/*pixel_qa.wgs.tif'))
         ls_fns = [_split(fn)[0] for fn in ls_fns]
         ls_fns = [_split(fn)[-1] for fn in ls_fns]
         dates = [int(fn.split('_')[4]) for fn in ls_fns]
@@ -168,7 +175,7 @@ def _scenemeta_location_intrayear(location, year, start_date, end_date):
     if exists(loc_path):
         _location = Location(loc_path)
         out_dir = _location.out_dir
-        ls_fns = glob(_join(out_dir, '*/*pixel_qa.tif'))
+        ls_fns = glob(_join(out_dir, '*/*pixel_qa.wgs.tif'))
         ls_fns = [_split(fn)[0] for fn in ls_fns]
         ls_fns = [_split(fn)[-1] for fn in ls_fns]
         dates = [fn.split('_')[4] for fn in ls_fns]
@@ -194,7 +201,7 @@ def _scenemeta_location_interyear(location, start_year, end_year, start_date, en
     if exists(loc_path):
         _location = Location(loc_path)
         out_dir = _location.out_dir
-        ls_fns = glob(_join(out_dir, '*/*pixel_qa.tif'))
+        ls_fns = glob(_join(out_dir, '*/*pixel_qa.wgs.tif'))
         ls_fns = [_split(fn)[0] for fn in ls_fns]
         ls_fns = [_split(fn)[-1] for fn in ls_fns]
         dates = [fn.split('_')[4] for fn in ls_fns]
@@ -289,6 +296,8 @@ def scenemeta_location_product_id(location, product_id):
 @app.route('/raster/<location>/<product_id>/<product>')
 @app.route('/raster/<location>/<product_id>/<product>/')
 def raster(location, product_id, product):
+    ranches = request.args.get('ranches', None)
+
     loc_path = _join(RANGESAT_DIR, location)
     _location = Location(loc_path)
     out_dir = _location.out_dir
@@ -304,7 +313,26 @@ def raster(location, product_id, product):
         return jsonify(None)
     fn = fn[0]
 
-    return send_file(fn)
+    file_name = '{product_id}__{product}.tif'.format(product_id=product_id, product=product)
+
+    if ranches is None:
+        return send_file(fn, as_attachment=True, attachment_filename=file_name)
+
+    ranches = literal_eval(ranches)
+
+    print(ranches)
+    file_path = os.path.abspath(_join('static', file_name))
+    _location.mask_ranches(fn, ranches, file_path)
+
+    @after_this_request
+    def remove_file(response):
+        try:
+            os.remove(file_path)
+        except Exception as error:
+            app.logger.error("Error removing or closing downloaded file handle", error)
+        return response
+
+    return send_file(file_path, as_attachment=True, attachment_filename=file_name)
 
 
 @app.route('/pasturestats/<location>')
@@ -343,6 +371,28 @@ def _get_agg_func(agg_func):
     return agg_func
 
 
+@app.route('/pasturestats/single-year/<location>')
+@app.route('/pasturestats/single-year/<location>/')
+def singleyear_pasturestats(location):
+    ranch = request.args.get('ranch', None)
+    pasture = request.args.get('pasture', None)
+    year = request.args.get('year', None)
+    start_date = request.args.get('start_date', None)
+    end_date = request.args.get('end_date', None)
+    agg_func = _get_agg_func(request.args.get('agg_func', 'mean'))
+
+    if agg_func is None:
+        return jsonify(None)
+
+    loc_path = _join(RANGESAT_DIR, location)
+    _location = Location(loc_path)
+    db_fn = _location.db_fn
+
+    return jsonify(query_singleyear_pasture_stats(db_fn, ranch=ranch, pasture=pasture, year=year,
+                                                 start_date=start_date, end_date=end_date, agg_func=agg_func,
+                                                 key_delimiter=_location.key_delimiter))
+
+
 @app.route('/pasturestats/intra-year/<location>')
 @app.route('/pasturestats/intra-year/<location>/')
 def intrayear_pasturestats(location):
@@ -361,7 +411,8 @@ def intrayear_pasturestats(location):
     db_fn = _location.db_fn
 
     return jsonify(query_intrayear_pasture_stats(db_fn, ranch=ranch, pasture=pasture, year=year,
-                                                 start_date=start_date, end_date=end_date, agg_func=agg_func))
+                                                 start_date=start_date, end_date=end_date, agg_func=agg_func,
+                                                 key_delimiter=_location.key_delimiter))
 
 
 @app.route('/pasturestats/inter-year/<location>')
@@ -384,7 +435,8 @@ def interyear_pasturestats(location):
 
     return jsonify(query_interyear_pasture_stats(db_fn, ranch=ranch, pasture=pasture,
                                                  start_year=start_year, end_year=end_year,
-                                                 start_date=start_date, end_date=end_date, agg_func=agg_func))
+                                                 start_date=start_date, end_date=end_date, agg_func=agg_func,
+                                                 key_delimiter=_location.key_delimiter))
 
 
 @app.route('/pasturestats/multi-year/<location>')
@@ -407,7 +459,8 @@ def multiyear_pasturestats(location):
 
     return jsonify(query_multiyear_pasture_stats(db_fn, ranch=ranch, pasture=pasture,
                                                  start_year=start_year, end_year=end_year,
-                                                 start_date=start_date, end_date=end_date, agg_func=agg_func))
+                                                 start_date=start_date, end_date=end_date, agg_func=agg_func,
+                                                 key_delimiter=_location.key_delimiter))
 
 
 @app.route('/gridmet/multi-year/<location>/<ranch>/<pasture>')
@@ -459,6 +512,7 @@ def gridmet_annualprogression_pasture(location, ranch, pasture):
         return jsonify(d)
     else:
         return jsonify(None)
+
 
 @app.route('/histogram/single-scene/<location>/<ranch>/<pasture>')
 @app.route('/histogram/single-scene/<location>/<ranch>/<pasture>/')

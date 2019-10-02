@@ -36,3 +36,18 @@ def get_sf_wgs_bounds(_sf_fn):
     w, n = pyproj.transform(sf_proj, wgs_proj, w, n)
 
     return e, s, w, n
+
+
+def bounds_intersect(a, b):
+    assert a[0] < a[2]
+    assert a[1] < a[3]
+    assert b[0] < b[2]
+    assert b[1] < b[3]
+
+    x1 = max(min(a[0], a[2]), min(b[0], b[2]))
+    y1 = max(min(a[1], a[3]), min(b[1], b[3]))
+    x2 = min(max(a[0], a[2]), max(b[0], b[2]))
+    y2 = min(max(a[1], a[3]), max(b[1], b[3]))
+    return x1 < x2 and y1 < y2
+
+

@@ -10,7 +10,7 @@ models:
             summer_slp: 330.25
             fall_int: -58.04
             fall_slp: 1070.64
-            required_coverage: 0.5
+            required_coverage: 0.33
             minimum_area_ha: 1.8
           - satellite: 7
             ndvi_threshold: 0.32
@@ -18,7 +18,7 @@ models:
             summer_slp: 343.18
             fall_int: -56.45
             fall_slp: 1042.00
-            required_coverage: 0.5
+            required_coverage: 0.33
             minimum_area_ha: 1.8
           - satellite: 5
             ndvi_threshold: 0.32
@@ -26,21 +26,21 @@ models:
             summer_slp: 343.18
             fall_int: -56.45
             fall_slp: 1042.00
-            required_coverage: 0.5
+            required_coverage: 0.33
             minimum_area_ha: 1.8
 
 # shapefile containing pastures to analyze
-sf_fn: /geodata/rangesat/Zumwalt/vector_data/Pastures_ForageAreas_2018_AllZumClip.shp
+sf_fn: /Users/roger/geodata/rangesat/Zumwalt/vector_data/Pastures_ForageAreas_2018_AllZumClip.shp
 
 # primary key for pastures in shapefile
 # e.g. key = feature['properties'][sf_feature_properties_key]
 sf_feature_properties_key: PastID_Key
 
 # location to place cropped landsat scenes and biomass rasters
-out_dir: /geodata/rangesat/Zumwalt/analyzed_rasters
+out_dir: /Users/roger/geodata/rangesat/Zumwalt/analyzed_rasters
 
 # directory containing extracted landsat scenes
-landsat_scene_directory: /geodata/torch-landsat
+landsat_scene_directory: /Users/roger/geodata/torch-landsat
 
 # path rows that should be skipped
 wrs_blacklist: [042029]

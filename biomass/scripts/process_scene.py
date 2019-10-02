@@ -2,6 +2,7 @@ import sys
 import yaml
 import os
 import shutil
+from subprocess import Popen
 import multiprocessing
 import csv
 import random
@@ -18,9 +19,11 @@ import fiona
 import rasterio
 
 sys.path.append(os.path.abspath('../../'))
-from biomass.landsat import LandSatScene
+sys.path.insert(0, '/Users/roger/rangesat-biomass')
+
+from biomass.landsat import LandSatScene, get_gz_scene_bounds
 from biomass.rangesat_biomass import ModelPars, SatModelPars, BiomassModel
-from biomass.all__your_base import get_sf_wgs_bounds
+from all_your_base import get_sf_wgs_bounds, bounds_intersect
 
 
 def extract(tar_fn, dst):
@@ -38,14 +41,24 @@ def process_scene(scn_fn, verbose=True):
 
     print('extracting...')
     scn_path = scn_fn.replace('.tar.gz', '')
-    extract(scn_fn, scn_path)
+    if _exists('/media/ramdisk'):
+        scn_path = _join('/media/ramdisk', _split(scn_path)[-1])
+#    extract(scn_fn, scn_path)
 
     # Load and crop LandSat Scene
     print('load')
     _ls = LandSatScene(scn_path)
 
-    print('clip')
-    ls =_ls.clip(bbox, out_dir)
+    try:
+        print('clip')
+        ls = _ls.clip(bbox, out_dir)
+    except:
+        ls = None
+        _ls = None
+        shutil.rmtree(scn_path)
+        return
+
+    _ls.dump_rgb(_join(ls.basedir, 'rgb.tif'), gamma=1.5)
 
     print('ls.basedir', ls.basedir)
     # Build biomass model
@@ -60,7 +73,42 @@ def process_scene(scn_fn, verbose=True):
     # get a summary dictionary of the landsat scene
     ls_summary = ls.summary_dict()
 
+    scn_dir = _join(out_dir, _ls.product_id)
+    reproject_scene(scn_dir)
+
+#    ls = None
+#    _ls = None
+#    shutil.rmtree(scn_path)
+
     return dict(res=res, ls_summary=ls_summary)
+
+
+def reproject_scene(scn_dir):
+
+    fns = glob(_join(scn_dir, '*.tif'))
+    fns.extend(glob(_join(scn_dir, '*/*.tif')))
+    fns = [fn for fn in fns if not fn.endswith('.wgs.tif')]
+    for fn in fns:
+        reproject_raster(fn)
+
+
+def reproject_raster(src):
+    dst = src[:-4] + '.wgs.vrt'
+    dst2 = src[:-4] + '.wgs.tif'
+
+    if _exists(dst):
+        os.remove(dst)
+    if _exists(dst2):
+        os.remove(dst2)
+
+    cmd = ['gdalwarp', '-t_srs', 'EPSG:4326', '-of', 'vrt', src, dst]
+    p = Popen(cmd)
+    p.wait()
+
+    cmd = ['gdal_translate', '-co', 'COMPRESS=LZW', '-of', 'GTiff', dst, dst2]
+    p = Popen(cmd)
+    p.wait()
+    assert _exists(dst)
 
 
 def dump_pasture_stats(results, dst_fn):
@@ -72,8 +120,11 @@ def dump_pasture_stats(results, dst_fn):
                       'biomass_total_kg', 'biomass_sd_gpm', 'summer_vi_mean_gpm',
                       'fall_vi_mean_gpm', 'fraction_summer',
                       'product_id', 'satellite', 'acquisition_date',
-                      'wrs', 'bounds', 'valid_pastures_cnt']
-
+                      'wrs', 'bounds', 'wgs_bounds', 'valid_pastures_cnt',
+                      'ndvi_mean', 'ndvi_sd', 'ndvi_10pct', 'ndvi_75pct', 'ndvi_90pct', 'ndvi_ci90',
+                      'nbr_mean', 'nbr_sd', 'nbr_10pct', 'nbr_75pct', 'nbr_90pct', 'nbr_ci90',
+                      'nbr2_mean', 'nbr2_sd', 'nbr2_10pct', 'nbr2_75pct', 'nbr2_90pct', 'nbr2_ci90']
+        
         writer = csv.DictWriter(_fp, fieldnames=fieldnames)
         writer.writeheader()
         for _res_d in results:  # scene
@@ -82,12 +133,15 @@ def dump_pasture_stats(results, dst_fn):
 
             for _pasture in _res:  # pasture
                 _model_stats = _pasture['model_stats']
+                _ls_stats = _pasture['ls_stats']
                 del _pasture['model_stats']
+                del _pasture['ls_stats']
 
                 for _model, _model_d in _model_stats.items():
                     _model_d = _model_d.asdict()
                     _model_d.update(_pasture)
                     _model_d.update(_ls_summary)
+                    _model_d.update(_ls_stats)
                     writer.writerow(_model_d)
 
 #
@@ -127,6 +181,12 @@ if __name__ == '__main__':
     out_dir = _d['out_dir']
 
     scene_fn = sys.argv[-1]
+
+    scn_bounds = get_gz_scene_bounds(scene_fn)
+    if not bounds_intersect(bbox, scn_bounds):
+        print('bounds do not intersect')
+        sys.exit()
+
     res = process_scene(scene_fn)
 
     prefix = _split(scene_fn)[-1].replace('.tar.gz', '')

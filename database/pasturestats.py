@@ -7,6 +7,7 @@ from os.path import join as _join
 from os.path import exists as _exists
 import shutil
 import ast
+import math
 
 import numpy as np
 
@@ -26,7 +27,10 @@ _measures = ('biomass_mean_gpm', 'biomass_ci90_gpm',
 def _aggregate(rows, agg_func):
     results = {}
     for measure in _measures:
-        results[measure] = agg_func([row[measure] for row in rows if row[measure] is not None])
+        val = agg_func([row[measure] for row in rows if row[measure] is not None])
+        if math.isnan(val):
+            val = None
+        results[measure] = val
     return results
 
 
@@ -81,8 +85,9 @@ def query_pasture_stats(db_fn, ranch=None, acquisition_date=None, pasture=None):
     return [dict(zip(_header, row)) for row in rows]
 
 
-def query_intrayear_pasture_stats(db_fn, ranch=None, pasture=None, year=None,
-                                  start_date=None, end_date=None, agg_func=np.mean):
+def query_singleyear_pasture_stats(db_fn, ranch=None, pasture=None, year=None,
+                                  start_date=None, end_date=None, agg_func=np.mean,
+                                  key_delimiter='+'):
     conn = sqlite3.connect(db_fn)
     c = conn.cursor()
 
@@ -119,6 +124,17 @@ def query_intrayear_pasture_stats(db_fn, ranch=None, pasture=None, year=None,
     mask = [_start_date < d < _end_date for d in dates]
 
     rows = [dict(zip(_header, row)) for m, row in zip(mask, rows) if m]
+    rows = [d for d in rows if d['biomass_mean_gpm'] is not None]
+    rows = sorted(rows, key=lambda k: k['acquisition_date'])
+    return rows
+
+
+def query_intrayear_pasture_stats(db_fn, ranch=None, pasture=None, year=None,
+                                  start_date=None, end_date=None, agg_func=np.mean,
+                                  key_delimiter='+'):
+    rows = query_singleyear_pasture_stats(db_fn, ranch=ranch, pasture=pasture, year=year,
+                                          start_date=start_date, end_date=end_date, agg_func=agg_func,
+                                          key_delimiter=key_delimiter)
 
     keys = set(row['key'] for row in rows)
     d = {key: [] for key in keys}
@@ -129,7 +145,7 @@ def query_intrayear_pasture_stats(db_fn, ranch=None, pasture=None, year=None,
     agg = []
     for key in d:
         agg.append(_aggregate(d[key], agg_func))
-        _pasture, _ranch = key.split('+')
+        _pasture, _ranch = key.split(key_delimiter)
         agg[-1]['pasture'] = _pasture
         agg[-1]['ranch'] = _ranch
 
@@ -137,7 +153,8 @@ def query_intrayear_pasture_stats(db_fn, ranch=None, pasture=None, year=None,
 
 
 def query_interyear_pasture_stats(db_fn, ranch=None, pasture=None, start_year=None, end_year=None,
-                                  start_date=None, end_date=None, agg_func=np.mean):
+                                  start_date=None, end_date=None, agg_func=np.mean,
+                                  key_delimiter='+'):
     conn = sqlite3.connect(db_fn)
     c = conn.cursor()
 
@@ -176,6 +193,7 @@ def query_interyear_pasture_stats(db_fn, ranch=None, pasture=None, start_year=No
         mask[i] = _start_date < d < _end_date
 
     rows = [dict(zip(_header, row)) for m, row in zip(mask, rows) if m]
+    rows = [d for d in rows if d['biomass_mean_gpm'] is not None]
 
     keys = set(row['key'] for row in rows)
     d = {key: [] for key in keys}
@@ -186,7 +204,7 @@ def query_interyear_pasture_stats(db_fn, ranch=None, pasture=None, start_year=No
     agg = []
     for key in d:
         agg.append(_aggregate(d[key], agg_func))
-        _pasture, _ranch = key.split('+')
+        _pasture, _ranch = key.split(key_delimiter)
         agg[-1]['pasture'] = _pasture
         agg[-1]['ranch'] = _ranch
 
@@ -194,7 +212,8 @@ def query_interyear_pasture_stats(db_fn, ranch=None, pasture=None, start_year=No
 
 
 def query_multiyear_pasture_stats(db_fn, ranch=None, pasture=None, start_year=None, end_year=None,
-                                  start_date=None, end_date=None, agg_func=np.mean):
+                                  start_date=None, end_date=None, agg_func=np.mean,
+                                  key_delimiter='+'):
     conn = sqlite3.connect(db_fn)
     c = conn.cursor()
 
@@ -229,6 +248,7 @@ def query_multiyear_pasture_stats(db_fn, ranch=None, pasture=None, start_year=No
         _end_date = date(*map(int, '{}-{}'.format(year, end_date).split('-')))
         mask = [_start_date < d < _end_date for d in dates]
         _rows = [dict(zip(_header, row)) for m, row in zip(mask, rows) if m]
+        _rows = [d for d in _rows if d['biomass_mean_gpm'] is not None]
 
         d = {key: [] for key in keys}
         for row in _rows:
@@ -236,7 +256,7 @@ def query_multiyear_pasture_stats(db_fn, ranch=None, pasture=None, start_year=No
 
         for key in d:
             agg.append(_aggregate(d[key], agg_func))
-            _pasture, _ranch = key.split('+')
+            _pasture, _ranch = key.split(key_delimiter)
             agg[-1]['pasture'] = _pasture
             agg[-1]['ranch'] = _ranch
             agg[-1]['year'] = year

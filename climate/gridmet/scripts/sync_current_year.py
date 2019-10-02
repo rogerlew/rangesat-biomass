@@ -13,7 +13,7 @@ from climate.gridmet import retrieve_timeseries, GridMetVariable
 
 current_year = datetime.now().year
 
-locations = ['Zumwalt']
+locations = ['Zumwalt', 'RCR']
 
 for location in locations:
     loc_path = _join(RANGESAT_DIR, location)

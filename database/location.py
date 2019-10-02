@@ -2,6 +2,7 @@ from glob import glob
 import os
 from os.path import split as _split
 from os.path import join as _join
+from os.path import exists as _exists
 from pprint import pprint
 import fiona
 import yaml
@@ -32,6 +33,9 @@ class Location(object):
         with open(cfg_fn) as fp:
             _d = yaml.safe_load(fp)
 
+
+        pprint(_d)
+
         self.cfg_fn = cfg_fn
         self._d = _d
         self.rangesat_dir, self.location = _split(loc_path)
@@ -50,8 +54,7 @@ class Location(object):
         for feature in sf:
             properties = feature['properties']
             key = properties[sf_feature_properties_key].replace(' ', '_')
-
-            pasture, ranch = key.split('+')
+            pasture, ranch = key.split(self.key_delimiter)
 
             if ranch.lower() not in [p.lower() for p in pastures]:
                 pastures[ranch] = set()
@@ -59,6 +62,18 @@ class Location(object):
             pastures[ranch].add(pasture)
 
         self.pastures = pastures
+
+    @property
+    def sf_fn(self):
+        return self._d['sf_fn']
+
+    @property
+    def sf_feature_properties_key(self):
+        return self._d['sf_feature_properties_key']
+
+    @property
+    def key_delimiter(self):
+        return self._d.get('sf_feature_properties_delimiter', '+')
 
     @property
     def models(self):
@@ -97,7 +112,7 @@ class Location(object):
             properties = feature['properties']
             key = properties[sf_feature_properties_key].replace(' ', '_')
 
-            _pasture, _ranch = key.split('+')
+            _pasture, _ranch = key.split(self.key_delimiter)
 
             if _pasture.lower() == pasture.lower() and _ranch.lower() == ranch.lower():
                 features.append(feature['geometry'])
@@ -108,6 +123,52 @@ class Location(object):
 
         x = data[np.logical_not(pasture_mask)]
         return [float(x) for x in x[x.mask == False]]
+
+    def mask_ranches(self, raster_fn, ranches, dst_fn, nodata=-9999):
+        loc_path = self.loc_path
+        _d = self._d
+
+        sf_fn = _join(loc_path, _d['sf_fn'])
+        sf_feature_properties_key = _d['sf_feature_properties_key']
+        sf_fn = os.path.abspath(sf_fn)
+        sf = fiona.open(sf_fn, 'r')
+
+        features = []
+        for feature in sf:
+            properties = feature['properties']
+            key = properties[sf_feature_properties_key].replace(' ', '_')
+
+            _pasture, _ranch = key.split(self.key_delimiter)
+
+            if any(_ranch.lower() == r.lower() for r in ranches):
+                features.append(feature['geometry'])
+
+        # true where valid
+        ds = rasterio.open(raster_fn)
+        pasture_mask, _, _ = raster_geometry_mask(ds, features)
+        data = np.ma.array(ds.read(1, masked=True), mask=pasture_mask)
+
+        assert _exists(_split(dst_fn)[0])
+
+        if isinstance(data, np.ma.core.MaskedArray):
+            data.fill_value = nodata
+            _data = data.filled()
+        else:
+            _data = data
+
+        with rasterio.Env():
+            profile = ds.profile
+            dtype = profile.get('dtype')
+            profile.update(
+                count=1,
+                nodata=nodata,
+                compress='lzw')
+
+            with rasterio.open(dst_fn, 'w', **profile) as dst:
+                dst.write(_data.astype(dtype), 1)
+
+        print('dst_fn', dst_fn)
+        assert _exists(dst_fn)
 
     def shape_inspection(self, ranch=None):
         loc_path = self.loc_path
@@ -124,7 +185,7 @@ class Location(object):
             properties = feature['properties']
             key = properties[sf_feature_properties_key].replace(' ', '_')
 
-            _pasture, _ranch = key.split('+')
+            _pasture, _ranch = key.split(self.key_delimiter)
 
             if ranch is None or _ranch.lower() == ranch.lower():
                 bboxs.append(fiona.bounds(feature))
@@ -171,7 +232,7 @@ class Location(object):
             properties = feature['properties']
             key = properties[sf_feature_properties_key].replace(' ', '_')
 
-            _pasture, _ranch = key.split('+')
+            _pasture, _ranch = key.split(self.key_delimiter)
 
             if _pasture.lower() == pasture.lower() and _ranch.lower() == ranch.lower():
                 properties = feature['properties']
@@ -216,7 +277,8 @@ class Location(object):
                     pasture=pasture, area_ha=area_ha, centroid=centroid)
 
     def geojson_filter(self, ranch=None, pasture=None):
-        sf_feature_properties_key = self._d['sf_feature_properties_key']
+        _d = self._d
+        sf_feature_properties_key = _d['sf_feature_properties_key']
 
         with open(self.geojson) as fp:
             js = json.load(fp)
@@ -227,7 +289,7 @@ class Location(object):
         _features = []
         for f in js['features']:
             key = f['properties'][sf_feature_properties_key].replace(' ', '_')
-            _pasture, _ranch = key.split('+')
+            _pasture, _ranch = key.split(self.key_delimiter)
 
             if (ranch is None or _ranch.lower() == ranch.lower()) and \
                (pasture is None or _pasture.lower() == pasture.lower()):
