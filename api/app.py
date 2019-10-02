@@ -303,7 +303,7 @@ def raster(location, product_id, product):
     out_dir = _location.out_dir
 
     fn = []
-    if product in ['ndvi', 'nbr', 'nbr2', 'pixel_qa']:
+    if product in ['ndvi', 'nbr', 'nbr2', 'pixel_qa', 'rgb']:
         fn = glob(_join(out_dir, product_id, '*{}.wgs.tif'.format(product)))
 
     elif product in ['biomass', 'fall_vi', 'summer_vi']:
