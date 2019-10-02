@@ -136,11 +136,15 @@ def place_order(bbox,
 
         scene_list.append(scene)
 
+    if len(scene_list) == 0:
+        return
+
     products = espa.get_available_products(scene_list[0])
-    if landsat_num == 4:
-        products = products['tm5_collection']['products']
-    elif landsat_num == 5:
-        products = products['tm5_collection']['products']
+    if landsat_num == 4 or landsat_num == 5:
+        try:
+            products = products['tm5_collection']['products']
+        except:
+            products = products['tm4_collection']['products']
     elif landsat_num == 7:
         products = products['etm7_collection']['products']
     else:
@@ -183,7 +187,7 @@ if len(catalog) <= 0:
 
 current_year = datetime.now().year
 
-locations = ['Zumwalt']
+locations = ['RCR']
 
 for location in locations:
     loc_path = _join(RANGESAT_DIR, location)
@@ -195,11 +199,11 @@ for location in locations:
     e, n, w, s = bbox
     bbox = (e, s, w, n)
 
-    y0 = current_year
-    yend = current_year
-    for landsat_num in [8, 7]:
+    y0 = 1980
+    yend = 2000
+    for landsat_num in [5]:
         for yr in range(y0, yend+1):
             place_order(bbox=bbox,
                         t0=datetime(yr, 1, 1),
-                        tend=datetime.now(),
+                        tend=datetime(yr, 12, 31),
                         landsat_num=landsat_num)

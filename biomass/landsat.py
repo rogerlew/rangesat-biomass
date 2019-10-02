@@ -20,6 +20,22 @@ from rasterio.io import MemoryFile
 from rasterio.warp import transform_bounds
 
 
+def get_gz_scene_bounds(fn):
+    assert _exists(fn)
+    assert fn.endswith('.tar.gz')
+
+    tf = tarfile.open(fn, 'r|gz')
+
+    member = tf.next()
+
+    while not member.name.endswith('.tif'):
+        member = tf.next()
+
+    data = io.BytesIO(tf.extractfile(member).read())
+    ds = MemoryFile(data).open()
+    return transform_bounds(ds.crs, 'EPSG:4326', *ds.bounds)
+
+
 class LandSatScene(object):
     """
     Band designations are documented here
@@ -84,14 +100,12 @@ class LandSatScene(object):
 
         product_id = None
         for member in tar.getnames():
-            print(member)
             if member.endswith('.tif'):
                 product_id = '_'.join(_split(member)[-1].split('_')[:7])
                 break
 
         d = {}
         for member in tar.getnames():
-            print(member)
             key = _split(member)[-1].replace('%s_' % product_id, '')\
                                     .replace('.tif', '')
 
@@ -241,7 +255,7 @@ class LandSatScene(object):
         if self.satellite == 8:
             return self._d['sr_aerosol'].read(1, masked=True)
 
-        elif self.satellite == 7:
+        else:
             return self._d['sr_atmos_opacity'].read(1, masked=True)
 
     def threshold_aerosol(self, threshold=101, mask=None):
@@ -266,21 +280,21 @@ class LandSatScene(object):
     def blue(self):
         if self.satellite == 8:
             return self._band_proc('sr_band2')
-        elif self.satellite == 7:
+        else:
             return self._band_proc('sr_band1')
 
     @property
     def green(self):
         if self.satellite == 8:
             return self._band_proc('sr_band3')
-        elif self.satellite == 7:
+        else:
             return self._band_proc('sr_band2')
 
     @property
     def red(self):
         if self.satellite == 8:
             return self._band_proc('sr_band4')
-        elif self.satellite == 7:
+        else:
             return self._band_proc('sr_band3')
 
     @property
@@ -305,21 +319,53 @@ class LandSatScene(object):
             return self._band_proc('sr_band7')
 
     @property
-    def rgb(self):
-        red = np.array(self.red, dtype=np.float64) / 2 ** 16 / 2
-        green = np.array(self.green, dtype=np.float64) / 2 ** 16 / 2
-        blue = np.array(self.blue, dtype=np.float64) / 2 ** 16 / 2
+    def rgb(self, red_gamma=1.03, blue_gamma=0.925):
+        red = np.array(self.red, dtype=np.float64) / 10000.0
+        green = np.array(self.green, dtype=np.float64) / 10000.0
+        blue = np.array(self.blue, dtype=np.float64) / 10000.0
 
-        return np.stack((red, green, blue), axis=2)
+        red = np.power(red, 1.0/red_gamma)
+        blue = np.power(blue, 1.0/blue_gamma)
+
+        red = np.clip(red, a_min=0.0, a_max=1.0)
+        green = np.clip(green, a_min=0.0, a_max=1.0)
+        blue = np.clip(blue, a_min=0.0, a_max=1.0)
+
+        return np.stack((red, green, blue), axis=0)
 
     @property
-    def rgba(self):
-        red = np.array(self.red, dtype=np.float64) / 2 ** 16 / 2
-        green = np.array(self.green, dtype=np.float64) / 2 ** 16 / 2
-        blue = np.array(self.blue, dtype=np.float64) / 2 ** 16 / 2
+    def rgba(self, red_gamma=1.03, blue_gamma=0.925):
+
+        red = np.array(self.red, dtype=np.float64) / 10000.0
+        green = np.array(self.green, dtype=np.float64) / 10000.0
+        blue = np.array(self.blue, dtype=np.float64) / 10000.0
         alpha = self.qa_clear
 
-        return np.stack((red, green, blue, alpha), axis=2)
+        red = np.power(red, 1.0/red_gamma)
+        blue = np.power(blue, 1.0/blue_gamma)
+
+        red = np.clip(red, a_min=0.0, a_max=1.0)
+        green = np.clip(green, a_min=0.0, a_max=1.0)
+        blue = np.clip(blue, a_min=0.0, a_max=1.0)
+
+        return np.stack((red, green, blue, alpha), axis=0)
+
+    def dump_rgb(self, dst_fn, gamma=None):
+        rgb = self.rgb
+        if gamma is not None:
+            rgb = np.power(rgb, 1.0/gamma)
+
+        rgb = np.array(rgb * 255, dtype=np.uint8)
+
+        with rasterio.Env():
+            profile = self._d['pixel_qa'].profile
+            profile.update(
+                dtype=rasterio.ubyte,
+                count=3,
+                compress='lzw')
+
+            with rasterio.open(dst_fn, 'w', **profile) as dst:
+                dst.write(rgb.astype(rasterio.ubyte))
 
     def _veg_proc(self, measure):
         res = self._d[measure].read(1, masked=True)

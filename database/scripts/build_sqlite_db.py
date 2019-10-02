@@ -4,16 +4,26 @@ from datetime import date
 import os
 import csv
 from os.path import join as _join
-from os.path import exists as _exists
+from os.path import exists
 import shutil
+import sys
 
+sys.path.insert(0, '/var/www/rangesat-biomass')
+from api.app import RANGESAT_DIR, Location
 
-if __name__ == "__main__":
-    out_dir = '/Users/roger/geodata/rangesat/Zumwalt/analyzed_rasters'
+locations = ['Zumwalt', 'RCR']
+
+for location in locations:
+    loc_path = _join(RANGESAT_DIR, location)
+    if exists(loc_path):
+        _location = Location(loc_path)
+
+    out_dir = _location.out_dir
+    key_delimiter = "+"#_location.
 
     db_fn = _join(out_dir, 'sqlite3.db')
 
-    if _exists(db_fn):
+    if exists(db_fn):
         os.remove(db_fn)
 
     conn = sqlite3.connect(db_fn)
@@ -26,7 +36,7 @@ if __name__ == "__main__":
                  valid_px INTEGER, coverage REAL, model	TEXT, biomass_mean_gpm REAL, biomass_ci90_gpm REAL,	
                  biomass_10pct_gpm REAL, biomass_75pct_gpm REAL, biomass_90pct_gpm REAL, biomass_total_kg REAL,
                  biomass_sd_gpm REAL, summer_vi_mean_gpm REAL, fall_vi_mean_gpm REAL, fraction_summer REAL, 
-                 satellite TEXT, acquisition_date TEXT, wrs TEXT, bounds TEXT,	valid_pastures_cnt INTEGER )""")
+                 satellite TEXT, acquisition_date TEXT, wrs TEXT, bounds TEXT, wgs_bounds TEXT, valid_pastures_cnt INTEGER )""")
 
     fns = glob(_join(out_dir, '*.csv'))
 
@@ -64,6 +74,7 @@ if __name__ == "__main__":
                 _acquisition_date, \
                 wrs, \
                 bounds, \
+                wgs_bounds, \
                 valid_pastures_cnt = row
 
                 if biomass_mean_gpm == '':
@@ -96,7 +107,7 @@ if __name__ == "__main__":
                 if fraction_summer == '':
                     fraction_summer = 'null'
 
-                pasture, ranch = key.split('+')
+                pasture, ranch = key.split(key_delimiter)
                 _date = product_id.split('_')[3]
                 acquisition_date = date(int(_date[:4]), int(_date[4:6]), int(_date[6:]))
 
@@ -104,7 +115,7 @@ if __name__ == "__main__":
                 query = """INSERT INTO pasture_stats VALUES ("{product_id}","{key}","{pasture}","{ranch}",\
 {total_px},{snow_px},{water_px},{aerosol_px},{valid_px},{coverage},"{model}",{biomass_mean_gpm},{biomass_ci90_gpm},\
 {biomass_10pct_gpm},{biomass_75pct_gpm},{biomass_90pct_gpm},{biomass_total_kg},{biomass_sd_gpm},{summer_vi_mean_gpm},
-{fall_vi_mean_gpm},{fraction_summer},"{satellite}","{acquisition_date}","{wrs}","{bounds}",{valid_pastures_cnt})""".\
+{fall_vi_mean_gpm},{fraction_summer},"{satellite}","{acquisition_date}","{wrs}","{bounds}","{wgs_bounds}",{valid_pastures_cnt})""".\
                           format(product_id=product_id, key=key, pasture=pasture, ranch=ranch, total_px=total_px,
                                  snow_px=snow_px, water_px=water_px, aerosol_px=aerosol_px, valid_px=valid_px,
                                  coverage=coverage, model=model, biomass_mean_gpm=biomass_mean_gpm,
@@ -113,11 +124,13 @@ if __name__ == "__main__":
                                  biomass_total_kg=biomass_total_kg, biomass_sd_gpm=biomass_sd_gpm,
                                  summer_vi_mean_gpm=summer_vi_mean_gpm, fall_vi_mean_gpm=fall_vi_mean_gpm,
                                  fraction_summer=fraction_summer, satellite=satellite,
-                                 acquisition_date=acquisition_date, wrs=wrs, bounds=bounds,
+                                 acquisition_date=acquisition_date, wrs=wrs, bounds=bounds, wgs_bounds=wgs_bounds,
                                  valid_pastures_cnt=valid_pastures_cnt)
 
-                c.execute(query)
-
+                try:
+                    c.execute(query)
+                except:
+                    print(query)
     # Save (commit) the changes
     conn.commit()
 

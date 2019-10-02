@@ -18,18 +18,24 @@ import fiona
 import rasterio
 
 sys.path.append(os.path.abspath('../../'))
+
 from biomass.landsat import LandSatScene
 from biomass.rangesat_biomass import ModelPars, SatModelPars, BiomassModel
 from all_your_base import get_sf_wgs_bounds
 import subprocess
 
+from time import time
 
 def process_scene(scn_fn):
     p = subprocess.Popen(['python3', 'process_scene.py', cfg_fn, scn_fn],
                          stderr=subprocess.PIPE, stdout=subprocess.PIPE)
     p.wait()
-    shutil.rmtree(scn_fn.replace('.tar.gz', ''))
 
+    scn_path = scn_fn.replace('.tar.gz', '')
+    if _exists('/media/ramdisk'):
+        scn_path = _join('/media/ramdisk', _split(scn_path)[-1])
+    if _exists(scn_path):
+        shutil.rmtree(scn_path)
 
 def is_processed(fn):
     global out_dir
@@ -86,7 +92,7 @@ if __name__ == '__main__':
     if wrs_blacklist is not None:
         fns = [fn for fn in fns if _split(fn)[-1][4:10] not in wrs_blacklist]
 
-    fns = [fn for fn in fns if not is_processed(fn)]
+#    fns = [fn for fn in fns if not is_processed(fn)]
 
 
 #    random.shuffle(fns)
@@ -97,9 +103,12 @@ if __name__ == '__main__':
         _results = pool.map(process_scene, fns)
     else:
         _results = []
-        for fn in fns:
-            print(fn)
+        n = len(fns)
+        for i, fn in enumerate(fns):
+            t0 = time()
+            print('{}\t{} of {}...'.format(fn, i+1, n), end='')
             _results.append(process_scene(fn))
+            print(time()-t0)
 
     sf.close()
     print('processed %i scenes in %f seconds' % (len(fns), time() - t0))

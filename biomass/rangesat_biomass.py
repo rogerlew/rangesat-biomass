@@ -94,6 +94,7 @@ class BiomassModel(object):
         #
         _nbr = np.ma.array(ls.nbr, mask=qa_mask)
         _nbr2 = np.ma.array(ls.nbr2, mask=qa_mask)
+        _ndvi = np.ma.array(ls.ndvi, mask=qa_mask)
 
         # `models` contains a list of Models. e.g. Shrub and Herbaceous.
         # Each Model has parameters for multiple satellites.
@@ -115,6 +116,11 @@ class BiomassModel(object):
         # biomass is the sum of fall and summer
         biomass = {m.name: summer_vi[m.name] + fall_vi[m.name] for m in models}
 
+        import matplotlib.pyplot as plt
+        for m in models:
+            plt.imshow(biomass[m.name])
+            plt.show()
+
         self.ls = ls
         self.aerosol_mask = aerosol_mask
         self.qa_notclear = qa_notclear
@@ -128,6 +134,10 @@ class BiomassModel(object):
         self.fall_vi = fall_vi
         self.biomass = biomass
         self.models = models
+        
+        self.nbr = _nbr
+        self.nbr2 = _nbr2
+        self.ndvi = _ndvi
 
     def export_grids(self, biomass_dir, dtype=rasterio.float32):
         """
@@ -247,12 +257,42 @@ class BiomassModel(object):
                 # store the model results
                 model_stats[m.name] = d
 
+            ls_stats = {}
+            _ndvi = np.ma.array(self.ndvi, mask=pasture_mask)
+            ls_stats['ndvi_mean'] = np.mean(_ndvi)
+            ls_stats['ndvi_sd'] = np.std(_ndvi)
+            _ndvi_percentiles = np.quantile(_ndvi, [0.1, 0.75, 0.9])
+            ls_stats['ndvi_10pct'] = _ndvi_percentiles[0]
+            ls_stats['ndvi_75pct'] = _ndvi_percentiles[1]
+            ls_stats['ndvi_90pct'] = _ndvi_percentiles[2]
+            ls_stats['ndvi_ci90'] = 1.645 * (ls_stats['ndvi_sd'] / sqrt(valid_px))
+        
+            _nbr = np.ma.array(self.nbr, mask=pasture_mask)
+            ls_stats['nbr_mean'] = np.mean(_nbr)
+            ls_stats['nbr_sd'] = np.std(_nbr)
+            _nbr_percentiles = np.quantile(_nbr, [0.1, 0.75, 0.9])
+            ls_stats['nbr_10pct'] = _nbr_percentiles[0]
+            ls_stats['nbr_75pct'] = _nbr_percentiles[1]
+            ls_stats['nbr_90pct'] = _nbr_percentiles[2]
+            ls_stats['nbr_ci90'] = 1.645 * (ls_stats['nbr_sd'] / sqrt(valid_px))
+
+            _nbr2 = np.ma.array(self.nbr2, mask=pasture_mask)
+            ls_stats['nbr2_mean'] = np.mean(_nbr2)
+            ls_stats['nbr2_sd'] = np.std(_nbr2)
+            _nbr2_percentiles = np.quantile(_nbr2, [0.1, 0.75, 0.9])
+            ls_stats['nbr2_10pct'] = _nbr2_percentiles[0]
+            ls_stats['nbr2_75pct'] = _nbr2_percentiles[1]
+            ls_stats['nbr2_90pct'] = _nbr2_percentiles[2]
+            ls_stats['nbr2_ci90'] = 1.645 * (ls_stats['nbr2_sd'] / sqrt(valid_px))
+
+
             # store the pasture results
             res.append(dict(product_id=ls.product_id, key=key,
                             total_px=total_px, area_ha=area_ha,
                             snow_px=snow_px, water_px=water_px,
                             aerosol_px=aerosol_px, valid_px=valid_px,
                             coverage=coverage, valid_pastures_cnt=valid_pastures_cnt,
-                            model_stats=model_stats))
+                            model_stats=model_stats,
+                            ls_stats=ls_stats))
 
         return res
