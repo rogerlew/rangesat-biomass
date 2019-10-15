@@ -19,9 +19,14 @@ import rasterio
 from rasterio.io import MemoryFile
 from rasterio.warp import transform_bounds
 
+# Landsat 8 Tasseled Cap Coefficients
+# https://community.hexagongeospatial.com/t5/Spatial-Modeler-Tutorials/Tasseled-Cap-Transformation-for-Landsat-8/ta-p/1609
+#
+# Landsat 7
+# https://gis.stackexchange.com/a/156255
 
 def get_gz_scene_bounds(fn):
-    assert _exists(fn)
+    assert _exists(fn), fn
     assert fn.endswith('.tar.gz')
 
     tf = tarfile.open(fn, 'r|gz')
@@ -119,9 +124,9 @@ class LandSatScene(object):
         self.fn = fn
         self._d = d
 
-    def __del__(self):
-        if self.tar is not None:
-            self.tar.close()
+#    def __del__(self):
+#        if self.tar is not None:
+#            self.tar.close()
 
     def get_dataset(self, name):
         if name not in self._d:
@@ -208,6 +213,30 @@ class LandSatScene(object):
     def __getitem__(self, key):
         return self._d[key]
 
+    def get_index(self, indexname):
+        if indexname.lower() == 'ndvi':
+            return self.ndvi
+        if indexname.lower() == 'nbr':
+            return self.nbr
+        if indexname.lower() in ['nbr2', 'ndti']:
+            return self.nbr2
+        if indexname.lower() == 'evi':
+            return self.evi
+        if indexname.lower() == 'tcg':
+            return self.tasseled_cap_greenness
+        if indexname.lower() == 'tcb':
+            return self.tasseled_cap_brightness
+        if indexname.lower() == 'tcw':
+            return self.tasseled_cap_wetness
+        if indexname.lower() == 'savi':
+            return self.savi
+        if indexname.lower() == 'msavi':
+            return self.msavi
+        if indexname.lower() == 'ndmi':
+            return self.ndmi
+
+        raise KeyError(indexname)
+
     def extract(self, dst):
         tar = tarfile.open(self.tar_fn)
         tar.extractall(path=dst)
@@ -270,6 +299,105 @@ class LandSatScene(object):
 
     def _band_proc(self, measure):
         return np.abs(self._d[measure].read(1, masked=True))
+
+    def _tasseled_cap_greenness__5(self):
+        return -0.1603 * self._band_proc('sr_band1') + \
+               -0.2819 * self._band_proc('sr_band2') + \
+               -0.4934 * self._band_proc('sr_band3') + \
+                0.7940 * self._band_proc('sr_band4') + \
+               -0.0002 * self._band_proc('sr_band5') + \
+               -0.1446 * self._band_proc('sr_band7')
+
+    def _tasseled_cap_greenness__7(self):
+        return -0.3344 * self._band_proc('sr_band1') + \
+               -0.3544 * self._band_proc('sr_band2') + \
+               -0.4556 * self._band_proc('sr_band3') + \
+                0.6966 * self._band_proc('sr_band4') + \
+               -0.0242 * self._band_proc('sr_band5') + \
+               -0.2630 * self._band_proc('sr_band7')
+
+    def _tasseled_cap_greenness__8(self):
+        return -0.2941 * self._band_proc('sr_band2') + \
+               -0.2430 * self._band_proc('sr_band3') + \
+               -0.5424 * self._band_proc('sr_band4') + \
+                0.7276 * self._band_proc('sr_band5') + \
+                0.0713 * self._band_proc('sr_band6') + \
+               -0.1608 * self._band_proc('sr_band7')
+
+    @property
+    def tasseled_cap_greenness(self):
+        if self.satellite == 8:
+            return self._tasseled_cap_greenness__8()
+        if self.satellite == 5:
+            return self._tasseled_cap_greenness__7()
+        if self.satellite == 7:
+            return self._tasseled_cap_greenness__5()
+
+    def _tasseled_cap_brightness__5(self):
+        return 0.2043 * self._band_proc('sr_band1') + \
+               0.4158 * self._band_proc('sr_band2') + \
+               0.5524 * self._band_proc('sr_band3') + \
+               0.5741 * self._band_proc('sr_band4') + \
+               0.3124 * self._band_proc('sr_band5') + \
+               0.2303 * self._band_proc('sr_band7')
+
+    def _tasseled_cap_brightness__7(self):
+        return 0.3561 * self._band_proc('sr_band1') + \
+               0.3972 * self._band_proc('sr_band2') + \
+               0.3904 * self._band_proc('sr_band3') + \
+               0.6966 * self._band_proc('sr_band4') + \
+               0.2286 * self._band_proc('sr_band5') + \
+               0.1596 * self._band_proc('sr_band7')
+
+    def _tasseled_cap_brightness__8(self):
+        return 0.3029 * self._band_proc('sr_band2') + \
+               0.2786 * self._band_proc('sr_band3') + \
+               0.4733 * self._band_proc('sr_band4') + \
+               0.5599 * self._band_proc('sr_band5') + \
+               0.5080 * self._band_proc('sr_band6') + \
+               0.1872 * self._band_proc('sr_band7')
+
+    @property
+    def tasseled_cap_brightness(self):
+        if self.satellite == 8:
+            return self._tasseled_cap_brightness__8()
+        if self.satellite == 7:
+            return self._tasseled_cap_brightness__7()
+        if self.satellite == 5:
+            return self._tasseled_cap_brightness__5()
+
+    def _tasseled_cap_wetness__5(self):
+        return +0.0315 * self._band_proc('sr_band1') + \
+                0.2021 * self._band_proc('sr_band2') + \
+                0.3102 * self._band_proc('sr_band3') + \
+                0.1594 * self._band_proc('sr_band4') + \
+               -0.6806 * self._band_proc('sr_band5') + \
+               -0.6109 * self._band_proc('sr_band7')
+
+    def _tasseled_cap_wetness__7(self):
+        return +0.2626 * self._band_proc('sr_band1') + \
+                0.2141 * self._band_proc('sr_band2') + \
+                0.0926 * self._band_proc('sr_band3') + \
+                0.0656 * self._band_proc('sr_band4') + \
+               -0.7629 * self._band_proc('sr_band5') + \
+               -0.5388 * self._band_proc('sr_band7')
+
+    def _tasseled_cap_wetness__8(self):
+        return +0.1511 * self._band_proc('sr_band2') + \
+                0.1973 * self._band_proc('sr_band3') + \
+                0.3283 * self._band_proc('sr_band4') + \
+                0.3407 * self._band_proc('sr_band5') + \
+               -0.7117 * self._band_proc('sr_band6') + \
+               -0.4559 * self._band_proc('sr_band7')
+
+    @property
+    def tasseled_cap_wetness(self):
+        if self.satellite == 8:
+            return self._tasseled_cap_wetness__8()
+        if self.satellite == 7:
+            return self._tasseled_cap_wetness__7()
+        if self.satellite == 5:
+            return self._tasseled_cap_wetness__5()
 
     @property
     def ultra_blue(self):
@@ -460,7 +588,10 @@ class LandSatScene(object):
 
         if bands is None:
             bands = ['pixel_qa', 'sr_ndvi', 'sr_nbr', 'sr_nbr2',
-                     'sr_aerosol', 'sr_nbr', 'sr_atmos_opacity']
+                     'sr_aerosol', 'sr_nbr', 'sr_atmos_opacity',
+                     'sr_evi', 'sr_band1', 'sr_band2', 'sr_band3',
+                     'sr_band4', 'sr_band5', 'sr_band6',
+                     'sr_band7']
 
         from rasterio.windows import Window
 
@@ -469,7 +600,11 @@ class LandSatScene(object):
         os.makedirs(outdir)
 
         for measure in self._d:
-            src = self.get_dataset(measure)
+            try:
+                src = self.get_dataset(measure)
+            except KeyError:
+                continue
+
             if '.xml' in measure:
                 dst_fn = _join(outdir, '%s_%s' % (self.product_id, measure))
                 with open(dst_fn, 'w') as fp:

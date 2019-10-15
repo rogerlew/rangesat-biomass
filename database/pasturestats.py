@@ -17,11 +17,18 @@ _header = ('product_id', 'key', 'pasture', 'ranch', 'total_px', 'snow_px',
            'valid_px', 'coverage', 'model', 'biomass_mean_gpm', 'biomass_ci90_gpm',
            'biomass_10pct_gpm', 'biomass_75pct_gpm', 'biomass_90pct_gpm', 'biomass_total_kg',
            'biomass_sd_gpm', 'summer_vi_mean_gpm', 'fall_vi_mean_gpm', 'fraction_summer',
+           'ndvi_mean', 'ndvi_sd', 'ndvi_10pct', 'ndvi_75pct', 'ndvi_90pct', 'ndvi_ci90',
+           'nbr_mean', 'nbr_sd', 'nbr_10pct', 'nbr_75pct', 'nbr_90pct', 'nbr_ci90',
+           'nbr2_mean', 'nbr2_sd', 'nbr2_10pct', 'nbr2_75pct', 'nbr2_90pct', 'nbr2_ci90',
            'satellite', 'acquisition_date')
 
 _measures = ('biomass_mean_gpm', 'biomass_ci90_gpm',
              'biomass_10pct_gpm', 'biomass_75pct_gpm', 'biomass_90pct_gpm', 'biomass_total_kg',
-             'biomass_sd_gpm', 'summer_vi_mean_gpm', 'fall_vi_mean_gpm')
+             'biomass_sd_gpm', 'summer_vi_mean_gpm', 'fall_vi_mean_gpm',
+             'ndvi_mean', 'ndvi_sd', 'ndvi_10pct', 'ndvi_75pct', 'ndvi_90pct', 'ndvi_ci90',
+             'nbr_mean', 'nbr_sd', 'nbr_10pct', 'nbr_75pct', 'nbr_90pct', 'nbr_ci90',
+             'nbr2_mean', 'nbr2_sd', 'nbr2_10pct', 'nbr2_75pct', 'nbr2_90pct', 'nbr2_ci90',
+             )
 
 
 def _aggregate(rows, agg_func):
@@ -118,7 +125,7 @@ def query_singleyear_pasture_stats(db_fn, ranch=None, pasture=None, year=None,
     c.execute(query)
     rows = c.fetchall()
 
-    dates = [date(*map(int, row[22].split('-'))) for row in rows]
+    dates = [date(*map(int, row[-1].split('-'))) for row in rows]
     _start_date = date(*map(int, '{}-{}'.format(year, start_date).split('-')))
     _end_date = date(*map(int, '{}-{}'.format(year, end_date).split('-')))
     mask = [_start_date < d < _end_date for d in dates]
@@ -179,7 +186,7 @@ def query_interyear_pasture_stats(db_fn, ranch=None, pasture=None, start_year=No
     c.execute(query)
     rows = c.fetchall()
 
-    dates = [date(*map(int, row[22].split('-'))) for row in rows]
+    dates = [date(*map(int, row[-1].split('-'))) for row in rows]
     start_year = int(start_year)
     end_year = int(end_year)
     mask = [start_year < d.year < end_year for d in dates]
@@ -237,7 +244,7 @@ def query_multiyear_pasture_stats(db_fn, ranch=None, pasture=None, start_year=No
 
     c.execute(query)
     rows = c.fetchall()
-    dates = [date(*map(int, row[22].split('-'))) for row in rows]
+    dates = [date(*map(int, row[-1].split('-'))) for row in rows]
     keys = set(row[1] for row in rows)
 
     agg = []

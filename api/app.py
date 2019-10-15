@@ -17,6 +17,8 @@ import fiona
 import rasterio
 from rasterio.mask import raster_geometry_mask
 
+from all_your_base import SCRATCH
+
 from database import Location
 from database.pasturestats import (
     query_pasture_stats,
@@ -313,16 +315,17 @@ def raster(location, product_id, product):
         return jsonify(None)
     fn = fn[0]
 
-    file_name = '{product_id}__{product}.tif'.format(product_id=product_id, product=product)
+    file_name = '{product_id}__{product}.wgs.tif'.format(product_id=product_id, product=product)
 
     if ranches is None:
         return send_file(fn, as_attachment=True, attachment_filename=file_name)
 
     ranches = literal_eval(ranches)
 
-    print(ranches)
-    file_path = os.path.abspath(_join('static', file_name))
-    _location.mask_ranches(fn, ranches, file_path)
+    assert exists(fn.replace('.wgs.tif', '.tif'))
+
+    file_path = os.path.abspath(_join(SCRATCH, file_name))
+    _location.mask_ranches(fn.replace('.wgs.tif', '.tif'), ranches, file_path)
 
     @after_this_request
     def remove_file(response):

@@ -48,7 +48,7 @@ class RasterDatasetInterpolator:
             if not ('lat' in var.dimensions[-2].lower() and 'lon' in var.dimensions[-1]):
                 self.lon_lat = True
 
-                print('file is lon_lat ordered')
+                #print('file is lon_lat ordered')
 
         # open the image
         self.ds = ds = gdal.Open(fname, GA_ReadOnly)
@@ -191,4 +191,4 @@ if __name__ == "__main__":
         '/home/weppdev/PycharmProjects/wepppy/wepppy/all_your_base/tests/8b2cd722b5444271a203229b1597b941.nc4')
 
     data = rds.get_location_info(lng=-120, lat=39)
-    print(data)
+    #print(data)
