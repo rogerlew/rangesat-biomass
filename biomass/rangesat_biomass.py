@@ -18,13 +18,16 @@ from .landsat import LandSatScene
 
 class SatModelPars(object):
     def __init__(self, satellite, ndvi_threshold, summer_int,
-                 summer_slp, fall_int, fall_slp, required_coverage, minimum_area_ha):
+                 summer_slp, fall_int, fall_slp, required_coverage, minimum_area_ha,
+                 summer_index='nbr', fall_index='ndti'):
         self.satellite = satellite
         self.ndvi_threshold = ndvi_threshold
         self.summer_int = summer_int
         self.summer_slp = summer_slp
+        self.summer_index = summer_index
         self.fall_int = fall_int
         self.fall_slp = fall_slp
+        self.fall_index = fall_index
         self.required_coverage = required_coverage
         self.minimum_area_ha = minimum_area_ha
 
@@ -92,8 +95,6 @@ class BiomassModel(object):
         #
         # Build the biomass model
         #
-        _nbr = np.ma.array(ls.nbr, mask=qa_mask)
-        _nbr2 = np.ma.array(ls.nbr2, mask=qa_mask)
         _ndvi = np.ma.array(ls.ndvi, mask=qa_mask)
 
         # `models` contains a list of Models. e.g. Shrub and Herbaceous.
@@ -103,23 +104,20 @@ class BiomassModel(object):
         # summer vegetation is based on NBR. It is applied when NDVI is greater than the ndvi_threshold
         # specified in the Model parameters.
         summer_mask = {m.name: ls.threshold_ndvi(m[sat].ndvi_threshold, mask=qa_mask) for m in models}
-        summer_vi = {m.name: summer_mask[m.name] *
-                     np.clip(m[sat].summer_int + m[sat].summer_slp * _nbr, a_min=0, a_max=None)
-                     for m in models}
+        summer_vi = {}
+        for m in models:
+            summer_index = np.ma.array(ls.get_index(m[sat].summer_index), mask=qa_mask)
+            summer_vi[m.name] = summer_mask[m.name] * np.clip(m[sat].summer_int + m[sat].summer_slp * summer_index, a_min=0, a_max=None)
 
         # fall is based on NBR2. It is applied when NDVI is less than or equal to the ndvi_threshold
         fall_mask = {m.name: np.logical_not(summer_mask[m.name]) for m in models}
-        fall_vi = {m.name: fall_mask[m.name] *
-                   np.clip(m[sat].fall_int + m[sat].fall_slp * _nbr2, a_min=0, a_max=None)
-                   for m in models}
+        fall_vi = {}
+        for m in models:
+            fall_index = np.ma.array(ls.get_index(m[sat].fall_index), mask=qa_mask)
+            fall_vi[m.name] = fall_mask[m.name] * np.clip(m[sat].fall_int + m[sat].fall_slp * fall_index, a_min=0, a_max=None)
 
         # biomass is the sum of fall and summer
         biomass = {m.name: summer_vi[m.name] + fall_vi[m.name] for m in models}
-
-        import matplotlib.pyplot as plt
-        for m in models:
-            plt.imshow(biomass[m.name])
-            plt.show()
 
         self.ls = ls
         self.aerosol_mask = aerosol_mask
@@ -134,10 +132,12 @@ class BiomassModel(object):
         self.fall_vi = fall_vi
         self.biomass = biomass
         self.models = models
-        
-        self.nbr = _nbr
-        self.nbr2 = _nbr2
+
         self.ndvi = _ndvi
+        self.nbr = np.ma.array(ls.nbr, mask=qa_mask)
+        self.nbr2 = np.ma.array(ls.nbr2, mask=qa_mask)
+#        self.evi = np.ma.array(ls.evi, mask=qa_mask)
+#        self.tcg = np.ma.array(ls.tasseled_cap_greenness, mask=qa_mask)
 
     def export_grids(self, biomass_dir, dtype=rasterio.float32):
         """
@@ -284,7 +284,6 @@ class BiomassModel(object):
             ls_stats['nbr2_75pct'] = _nbr2_percentiles[1]
             ls_stats['nbr2_90pct'] = _nbr2_percentiles[2]
             ls_stats['nbr2_ci90'] = 1.645 * (ls_stats['nbr2_sd'] / sqrt(valid_px))
-
 
             # store the pasture results
             res.append(dict(product_id=ls.product_id, key=key,

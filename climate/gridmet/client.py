@@ -11,6 +11,7 @@ import numpy as np
 
 import netCDF4
 
+from all_your_base import SCRATCH
 from all_your_base.locationinfo import RasterDatasetInterpolator
 
 
@@ -72,7 +73,7 @@ def _retrieve(gridvariable: GridMetVariable, bbox, year):
     s = requests.Session()
     response = s.get(url, headers={'referer': referer}, stream=True)
     id = uuid.uuid4()
-    with open('temp/%s.nc' % id, 'wb') as out_file:
+    with open(_join(SCRATCH, '%s.nc' % id), 'wb') as out_file:
         shutil.copyfileobj(response.raw, out_file)
     del response
 
@@ -109,27 +110,35 @@ def retrieve_timeseries(variables, locations, start_year, end_year, met_dir):
         for year in range(start_year, end_year + 1):
             print('acquiring', gridvariable, year, bbox)
             id = _retrieve(gridvariable, bbox, year)
-            fn = 'temp/%s.nc' % id
+            fn = _join(SCRATCH, '%s.nc' % id)
             print('extracting locations from', fn)
-            _d = nc_extract(fn, locations)
 
-            abbrv, variable_name = _var_meta[gridvariable]
-            ds = netCDF4.Dataset(fn)
-            variable = ds.variables[variable_name]
-            desc = variable.description
-            units = variable.units
+            try:
+                _d = nc_extract(fn, locations)
 
-            if _d is None:
-                for key in locations:
-                    dump(abbrv, year, key, ts, desc, units, met_dir)
-                    lon, lat = locations[key]
-                    #d['{}-{}-{}'.format(abbrv, year, key)] = (None, desc, units)
-            else:
-                for key, ts in _d.items():
-                    dump(abbrv, year, key, ts, desc, units, met_dir)
-                    #ts = [int(x) for x in ts]
-                    #d['{}-{}-{}'.format(abbrv, year, key)] = (ts, desc, units)
+                abbrv, variable_name = _var_meta[gridvariable]
+                ds = netCDF4.Dataset(fn)
+                variable = ds.variables[variable_name]
+                desc = variable.description
+                units = variable.units
 
+                if _d is None:
+                    for key in locations:
+                        dump(abbrv, year, key, None, desc, units, met_dir)
+                        #lon, lat = locations[key]
+                        #d['{}-{}-{}'.format(abbrv, year, key)] = (None, desc, units)
+                else:
+                    for key, ts in _d.items():
+                        ts = np.array(ts, dtype=np.float64)
+                        ts *= variable.scale_factor
+                        ts += variable.add_offset
+                        ts -= 273.15
+                        dump(abbrv, year, key, ts, desc, units, met_dir)
+                        #ts = [int(x) for x in ts]
+                        #d['{}-{}-{}'.format(abbrv, year, key)] = (ts, desc, units)
+            except:
+                os.remove(fn)
+                raise
     #return d
 
 
@@ -151,7 +160,7 @@ if __name__ == "__main__":
             pastures = _ranch['pastures']
 
             for pasture in pastures:
-                print(pasture, ranch)
+                #print(pasture, ranch)
                 _pasture = _location.serialized_pasture(ranch, pasture)
                 ranch = ranch.replace("'", "~").replace(' ', '_')
                 pasture = pasture.replace("'", "~").replace(' ', '_')
@@ -161,7 +170,7 @@ if __name__ == "__main__":
     end_year = 2019
 
     met_dir = _join(_location.loc_path, 'gridmet')
-    print(met_dir)
+    #print(met_dir)
 
     if exists(met_dir):
         shutil.rmtree(met_dir)

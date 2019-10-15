@@ -20,4 +20,4 @@ res = pasturestats.query_interyear_pasture_stats(db_fn, ranch=None, start_year=1
                                                  start_date='4-1', end_date='7-31',
                                                  agg_func=np.mean, key_delimiter='+')
 
-print(len(res))
+#print(len(res))

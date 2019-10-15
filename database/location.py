@@ -1,4 +1,5 @@
 from glob import glob
+import sys
 import os
 from os.path import split as _split
 from os.path import join as _join
@@ -9,12 +10,16 @@ import yaml
 import pyproj
 import numpy as np
 import json
+from subprocess import Popen
 
 import rasterio
 from rasterio.mask import raster_geometry_mask
 
 from osgeo import osr
 
+sys.path.insert(0, os.path.abspath('../'))
+
+from all_your_base import GEODATA
 
 def wkt_2_proj4(wkt):
     srs = osr.SpatialReference()
@@ -31,7 +36,9 @@ class Location(object):
         assert len(cfg_fn) == 1, cfg_fn
         cfg_fn = cfg_fn[0]
         with open(cfg_fn) as fp:
-            _d = yaml.safe_load(fp)
+            yaml_txt = fp.read()
+            yaml_txt = yaml_txt.replace('{GEODATA}', GEODATA)
+            _d = yaml.safe_load(yaml_txt)
 
 
         pprint(_d)
@@ -125,6 +132,18 @@ class Location(object):
         return [float(x) for x in x[x.mask == False]]
 
     def mask_ranches(self, raster_fn, ranches, dst_fn, nodata=-9999):
+        """
+
+        :param raster_fn: utm raster
+        :param ranches:
+        :param dst_fn:
+        :param nodata:
+        :return:
+        """
+
+        assert _exists(_split(dst_fn)[0])
+        assert dst_fn.endswith('.tif')
+
         loc_path = self.loc_path
         _d = self._d
 
@@ -143,32 +162,73 @@ class Location(object):
             if any(_ranch.lower() == r.lower() for r in ranches):
                 features.append(feature['geometry'])
 
-        # true where valid
-        ds = rasterio.open(raster_fn)
-        pasture_mask, _, _ = raster_geometry_mask(ds, features)
-        data = np.ma.array(ds.read(1, masked=True), mask=pasture_mask)
+        try:
+            # true where valid
+            ds = rasterio.open(raster_fn)
+            pasture_mask, _, _ = raster_geometry_mask(ds, features)
+            data = np.ma.array(ds.read(1, masked=True), mask=pasture_mask)
 
-        assert _exists(_split(dst_fn)[0])
+            head, tail = _split(dst_fn)
+            utm_dst_fn = _join(head, '_utm_' + tail)
 
-        if isinstance(data, np.ma.core.MaskedArray):
-            data.fill_value = nodata
-            _data = data.filled()
-        else:
-            _data = data
+            if isinstance(data, np.ma.core.MaskedArray):
+                data.fill_value = nodata
+                _data = data.filled()
+            else:
+                _data = data
 
-        with rasterio.Env():
-            profile = ds.profile
-            dtype = profile.get('dtype')
-            profile.update(
-                count=1,
-                nodata=nodata,
-                compress='lzw')
+            with rasterio.Env():
+                profile = ds.profile
+                dtype = profile.get('dtype')
+                profile.update(
+                    count=1,
+                    nodata=nodata,
+                    compress='lzw')
 
-            with rasterio.open(dst_fn, 'w', **profile) as dst:
-                dst.write(_data.astype(dtype), 1)
+                with rasterio.open(utm_dst_fn, 'w', **profile) as dst:
+                    dst.write(_data.astype(dtype), 1)
 
-        print('dst_fn', dst_fn)
-        assert _exists(dst_fn)
+            assert _exists(utm_dst_fn)
+        except:
+            if _exists(utm_dst_fn):
+                os.remove(utm_dst_fn)
+            raise
+
+        try:
+            dst_vrt_fn = dst_fn.replace('.tif', '.vrt')
+
+            if _exists(dst_vrt_fn):
+                os.remove(dst_vrt_fn)
+
+            cmd = ['gdalwarp', '-t_srs', 'EPSG:4326', '-of', 'vrt', utm_dst_fn, dst_vrt_fn]
+            p = Popen(cmd)
+            p.wait()
+
+            assert _exists(dst_vrt_fn)
+        except:
+            if _exists(dst_vrt_fn):
+                os.remove(dst_vrt_fn)
+            raise
+
+        try:
+            if _exists(dst_fn):
+                os.remove(dst_fn)
+
+            cmd = ['gdal_translate', '-co', 'COMPRESS=LZW', '-of', 'GTiff', dst_vrt_fn, dst_fn]
+            p = Popen(cmd)
+            p.wait()
+
+            assert _exists(dst_fn)
+        except:
+            if _exists(dst_fn):
+                os.remove(dst_fn)
+            raise
+
+        if _exists(utm_dst_fn):
+            os.remove(utm_dst_fn)
+
+        if _exists(dst_vrt_fn):
+            os.remove(dst_vrt_fn)
 
     def shape_inspection(self, ranch=None):
         loc_path = self.loc_path

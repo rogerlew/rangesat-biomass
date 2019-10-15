@@ -23,10 +23,11 @@ sys.path.insert(0, '/Users/roger/rangesat-biomass')
 
 from biomass.landsat import LandSatScene, get_gz_scene_bounds
 from biomass.rangesat_biomass import ModelPars, SatModelPars, BiomassModel
-from all_your_base import get_sf_wgs_bounds, bounds_intersect
+from all_your_base import get_sf_wgs_bounds, bounds_intersect, SCRATCH
 
 
 def extract(tar_fn, dst):
+    print(tar_fn, dst)
     tar = tarfile.open(tar_fn)
     tar.extractall(path=dst)
     tar.close()
@@ -41,9 +42,9 @@ def process_scene(scn_fn, verbose=True):
 
     print('extracting...')
     scn_path = scn_fn.replace('.tar.gz', '')
-    if _exists('/media/ramdisk'):
-        scn_path = _join('/media/ramdisk', _split(scn_path)[-1])
-#    extract(scn_fn, scn_path)
+    if _exists(SCRATCH):
+        scn_path = _join(SCRATCH, _split(scn_path)[-1])
+    extract(scn_fn, scn_path)
 
     # Load and crop LandSat Scene
     print('load')
@@ -153,11 +154,15 @@ def dump_pasture_stats(results, dst_fn):
 
 if __name__ == '__main__':
 
+    from all_your_base import GEODATA
+
     cfg_fn = sys.argv[-2]
     assert cfg_fn.endswith('.yaml'), "Is %s a config file?" % cfg_fn
 
     with open(cfg_fn) as fp:
-        _d = yaml.safe_load(fp)
+        yaml_txt = fp.read()
+        yaml_txt = yaml_txt.replace('{GEODATA}', GEODATA)
+        _d = yaml.safe_load(yaml_txt)
 
     _models = _d['models']
     models = []

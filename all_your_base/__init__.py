@@ -1,3 +1,4 @@
+from os.path import exists
 
 import fiona
 import pyproj
@@ -5,6 +6,16 @@ import pyproj
 from osgeo import osr
 import numpy as np
 
+GEODATA = '/geodata'
+
+if not exists(GEODATA):
+    GEODATA = '/Users/roger/GEODATA'
+
+
+SCRATCH = '/media/ramdisk'
+
+if not exists(SCRATCH):
+    SCRATCH = '/Users/roger/Downloads'
 
 def wkt_2_proj4(wkt):
     srs = osr.SpatialReference()
