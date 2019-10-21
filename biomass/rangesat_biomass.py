@@ -16,6 +16,16 @@ import numpy as np
 from .landsat import LandSatScene
 
 
+def _quantile(a, q):
+    if type(a) is np.ma.masked_array:
+        _a = a[~a.mask]
+        if len(_a) == 0:
+            return [None for x in q]
+        return np.quantile(_a, q)
+
+    return np.quantile(a, q)
+
+
 class SatModelPars(object):
     def __init__(self, satellite, ndvi_threshold, summer_int,
                  summer_slp, fall_int, fall_slp, required_coverage, minimum_area_ha,
@@ -231,7 +241,7 @@ class BiomassModel(object):
                     d.biomass_total_kg = d.biomass_mean_gpm * area_ha * 10
 
                     # determine the 10th, 75th and 90th percentiles of the distribution
-                    percentiles = np.quantile(pasture_biomass, [0.1, 0.75, 0.9])
+                    percentiles = _quantile(pasture_biomass, [0.1, 0.75, 0.9])
                     d.biomass_10pct_gpm = percentiles[0]
                     d.biomass_75pct_gpm = percentiles[1]
                     d.biomass_90pct_gpm = percentiles[2]
@@ -261,7 +271,7 @@ class BiomassModel(object):
             _ndvi = np.ma.array(self.ndvi, mask=pasture_mask)
             ls_stats['ndvi_mean'] = np.mean(_ndvi)
             ls_stats['ndvi_sd'] = np.std(_ndvi)
-            _ndvi_percentiles = np.quantile(_ndvi, [0.1, 0.75, 0.9])
+            _ndvi_percentiles = _quantile(_ndvi, [0.1, 0.75, 0.9])
             ls_stats['ndvi_10pct'] = _ndvi_percentiles[0]
             ls_stats['ndvi_75pct'] = _ndvi_percentiles[1]
             ls_stats['ndvi_90pct'] = _ndvi_percentiles[2]
@@ -270,7 +280,7 @@ class BiomassModel(object):
             _nbr = np.ma.array(self.nbr, mask=pasture_mask)
             ls_stats['nbr_mean'] = np.mean(_nbr)
             ls_stats['nbr_sd'] = np.std(_nbr)
-            _nbr_percentiles = np.quantile(_nbr, [0.1, 0.75, 0.9])
+            _nbr_percentiles = _quantile(_nbr, [0.1, 0.75, 0.9])
             ls_stats['nbr_10pct'] = _nbr_percentiles[0]
             ls_stats['nbr_75pct'] = _nbr_percentiles[1]
             ls_stats['nbr_90pct'] = _nbr_percentiles[2]
@@ -279,7 +289,7 @@ class BiomassModel(object):
             _nbr2 = np.ma.array(self.nbr2, mask=pasture_mask)
             ls_stats['nbr2_mean'] = np.mean(_nbr2)
             ls_stats['nbr2_sd'] = np.std(_nbr2)
-            _nbr2_percentiles = np.quantile(_nbr2, [0.1, 0.75, 0.9])
+            _nbr2_percentiles = _quantile(_nbr2, [0.1, 0.75, 0.9])
             ls_stats['nbr2_10pct'] = _nbr2_percentiles[0]
             ls_stats['nbr2_75pct'] = _nbr2_percentiles[1]
             ls_stats['nbr2_90pct'] = _nbr2_percentiles[2]

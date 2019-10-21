@@ -8,7 +8,7 @@ from os.path import join as _join
 from os.path import exists
 
 
-from api.app import RANGESAT_DIR, Location
+from api.app import RANGESAT_DIRS, Location
 from climate.gridmet import retrieve_timeseries, GridMetVariable
 
 current_year = datetime.now().year
@@ -16,22 +16,27 @@ current_year = datetime.now().year
 locations = ['Zumwalt', 'RCR']
 
 for location in locations:
-    loc_path = _join(RANGESAT_DIR, location)
-    if exists(loc_path):
-        _location = Location(loc_path)
+    _location = None
+    for rangesat_dir in RANGESAT_DIRS:
+        loc_path = _join(rangesat_dir, location)
+        if exists(loc_path):
+            _location = Location(loc_path)
+            break
 
-        ranches = _location.ranches
+    assert _location is not None
 
-        geo_locations = {}
-        for ranch in ranches:
-            _ranch = _location.serialized_ranch(ranch)
-            pastures = _ranch['pastures']
+    ranches = _location.ranches
 
-            for pasture in pastures:
-                _pasture = _location.serialized_pasture(ranch, pasture)
-                ranch = ranch.replace("'", "~").replace(' ', '_')
-                pasture = pasture.replace("'", "~").replace(' ', '_')
-                geo_locations[(pasture, ranch)] = _pasture['centroid']
+    geo_locations = {}
+    for ranch in ranches:
+        _ranch = _location.serialized_ranch(ranch)
+        pastures = _ranch['pastures']
+
+        for pasture in pastures:
+            _pasture = _location.serialized_pasture(ranch, pasture)
+            ranch = ranch.replace("'", "~").replace(' ', '_')
+            pasture = pasture.replace("'", "~").replace(' ', '_')
+            geo_locations[(pasture, ranch)] = _pasture['centroid']
 
     start_year = current_year
     end_year = current_year
