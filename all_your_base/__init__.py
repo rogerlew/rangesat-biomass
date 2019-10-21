@@ -1,4 +1,5 @@
 from os.path import exists
+from os.path import join as _join
 
 import fiona
 import pyproj
@@ -6,16 +7,28 @@ import pyproj
 from osgeo import osr
 import numpy as np
 
-GEODATA = '/geodata'
 
-if not exists(GEODATA):
-    GEODATA = '/Users/roger/GEODATA'
+GEODATA_DIRS = []
+if exists('/geodata'):
+    GEODATA_DIRS.append('/geodata')
+if exists('/Users/roger/geodata'):
+    GEODATA_DIRS.append('/Users/roger/geodata')
+if exists('/space'):
+    GEODATA_DIRS.append('/space')
+assert len(GEODATA_DIRS) > 0
+
+RANGESAT_DIRS = []
+for geo_dir in GEODATA_DIRS:
+    if exists(_join(geo_dir, 'rangesat')):
+        RANGESAT_DIRS.append(_join(geo_dir, 'rangesat'))
+assert len(RANGESAT_DIRS) > 0
 
 
 SCRATCH = '/media/ramdisk'
 
 if not exists(SCRATCH):
     SCRATCH = '/Users/roger/Downloads'
+
 
 def wkt_2_proj4(wkt):
     srs = osr.SpatialReference()

@@ -19,7 +19,7 @@ from osgeo import osr
 
 sys.path.insert(0, os.path.abspath('../'))
 
-from all_your_base import GEODATA
+from all_your_base import GEODATA_DIRS
 
 def wkt_2_proj4(wkt):
     srs = osr.SpatialReference()
@@ -28,6 +28,8 @@ def wkt_2_proj4(wkt):
 
 
 wgs84_proj4 = '+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs'
+
+GEODATA = GEODATA_DIRS[0]
 
 
 class Location(object):
@@ -39,9 +41,6 @@ class Location(object):
             yaml_txt = fp.read()
             yaml_txt = yaml_txt.replace('{GEODATA}', GEODATA)
             _d = yaml.safe_load(yaml_txt)
-
-
-        pprint(_d)
 
         self.cfg_fn = cfg_fn
         self._d = _d

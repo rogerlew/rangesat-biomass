@@ -12,6 +12,10 @@ import math
 import numpy as np
 
 
+_month_labels = ['January', 'February', 'March', 'April', 'May', 'June',
+                'July', 'August', 'September', 'October', 'November', 'December']
+
+
 _header = ('product_id', 'key', 'pasture', 'ranch', 'total_px', 'snow_px', 
            'water_px', 'aerosol_px',
            'valid_px', 'coverage', 'model', 'biomass_mean_gpm', 'biomass_ci90_gpm',
@@ -155,6 +159,76 @@ def query_intrayear_pasture_stats(db_fn, ranch=None, pasture=None, year=None,
         _pasture, _ranch = key.split(key_delimiter)
         agg[-1]['pasture'] = _pasture
         agg[-1]['ranch'] = _ranch
+
+    return agg
+
+
+def query_seasonalprogression_pasture_stats(db_fn, ranch=None, pasture=None, agg_func=np.mean,
+                                  key_delimiter='+'):
+    conn = sqlite3.connect(db_fn)
+    c = conn.cursor()
+
+    query = 'SELECT ' + \
+            ', '.join(_header) + \
+            ' FROM pasture_stats'
+
+    i = 0
+    if ranch is not None or pasture is not None:
+        query += ' WHERE'
+
+    if ranch is not None:
+        query += ' ranch = "{ranch}"'.format(ranch=ranch.replace('_', ' '))
+        i += 1
+
+    if pasture is not None:
+        if i > 0:
+            query += ' AND'
+        query += ' pasture = "{pasture}"'.format(pasture=pasture.replace('_', ' '))
+        i += 1
+
+    c.execute(query)
+    rows = c.fetchall()
+    rows = [dict(zip(_header, row)) for row in rows]
+
+    keys = set(row['key'] for row in rows)
+
+    monthlies = {key: [[] for i in range(12)] for key in keys}
+    for i, row in enumerate(rows):
+        if row['biomass_mean_gpm'] is None:
+            continue
+
+        month_indx = int(row['acquisition_date'].split('-')[1]) - 1
+
+        assert 0 <= month_indx <= 11, month_indx
+        monthlies[row['key']][month_indx].append(row)
+
+#    agg = []
+#    for key in keys:
+#        _pasture, _ranch = key.split(key_delimiter)
+#        _monthlies = []
+#
+#        for d in monthlies[key]:
+#            _monthlies.append(_aggregate(d, agg_func))
+#            _monthlies[-1]['pasture'] = _pasture
+#            _monthlies[-1]['ranch'] = _ranch
+#
+#        agg.append(_monthlies)
+#
+#    return agg
+
+
+    agg = {}
+    for key in keys:
+        _pasture, _ranch = key.split(key_delimiter)
+        _monthlies = []
+
+        for i, d in enumerate(monthlies[key]):
+            _monthlies.append(_aggregate(d, agg_func))
+            _monthlies[-1]['pasture'] = _pasture
+            _monthlies[-1]['ranch'] = _ranch
+            _monthlies[-1]['month'] = _month_labels[i]
+
+        agg[key] = _monthlies
 
     return agg
 

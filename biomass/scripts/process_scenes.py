@@ -21,10 +21,13 @@ sys.path.append(os.path.abspath('../../'))
 
 from biomass.landsat import LandSatScene
 from biomass.rangesat_biomass import ModelPars, SatModelPars, BiomassModel
-from all_your_base import get_sf_wgs_bounds, GEODATA, SCRATCH
+from all_your_base import get_sf_wgs_bounds, GEODATA_DIRS, SCRATCH
 import subprocess
 
 from time import time
+
+
+GEODATA = GEODATA_DIRS[0]
 
 
 def process_scene(scn_fn):
@@ -78,6 +81,9 @@ bbox = get_sf_wgs_bounds(sf_fn)
 landsat_scene_directory = _d['landsat_scene_directory']
 wrs_blacklist = _d.get('wrs_blacklist', None)
 wrs_whitelist = _d.get('wrs_whitelist', None)
+years = _d.get('years', None)
+if years is not None:
+    years = [int(yr) for yr in years]
 
 sf_feature_properties_key = _d.get('sf_feature_properties_key', 'key')
 
@@ -114,6 +120,14 @@ if __name__ == '__main__':
     fns = [fn for fn in fns if not is_processed(fn)]
 
 #    random.shuffle(fns)
+
+    if years is not None:
+        _fns = []
+        for fn in fns:
+            if int(_split(fn)[-1][10:14]) in years:
+                _fns.append(fn)
+
+        fns = _fns
 
     if use_multiprocessing:
         # run the model

@@ -84,9 +84,17 @@ def process_scene(scn_fn, verbose=True):
     return dict(res=res, ls_summary=ls_summary)
 
 
-def reproject_scene(scn_dir):
+def _contains_any(target, matches):
+    for match in matches:
+        if match in target:
+            return True
 
+    return False
+
+
+def reproject_scene(scn_dir):
     fns = glob(_join(scn_dir, '*.tif'))
+    fns = [fn for fn in fns if _contains_any(fn, ['rgb', 'ndvi'])]
     fns.extend(glob(_join(scn_dir, '*/*.tif')))
     fns = [fn for fn in fns if not fn.endswith('.wgs.tif')]
     for fn in fns:
@@ -154,7 +162,8 @@ def dump_pasture_stats(results, dst_fn):
 
 if __name__ == '__main__':
 
-    from all_your_base import GEODATA
+    from all_your_base import GEODATA_DIRS
+    GEODATA = GEODATA_DIRS[0]
 
     cfg_fn = sys.argv[-2]
     assert cfg_fn.endswith('.yaml'), "Is %s a config file?" % cfg_fn

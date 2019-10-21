@@ -9,14 +9,19 @@ import shutil
 import sys
 
 sys.path.insert(0, '/var/www/rangesat-biomass')
-from api.app import RANGESAT_DIR, Location
+from api.app import RANGESAT_DIRS, Location
 
-locations = ['Zumwalt', 'RCR']
+locations = ['Zumwalt']
 
 for location in locations:
-    loc_path = _join(RANGESAT_DIR, location)
-    if exists(loc_path):
-        _location = Location(loc_path)
+    _location = None
+    for rangesat_dir in RANGESAT_DIRS:
+        loc_path = _join(rangesat_dir, location)
+        if exists(loc_path):
+            _location = Location(loc_path)
+            break
+
+    assert _location is not None
 
     out_dir = _location.out_dir
     key_delimiter = "+"#_location.

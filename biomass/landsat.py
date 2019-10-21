@@ -25,6 +25,7 @@ from rasterio.warp import transform_bounds
 # Landsat 7
 # https://gis.stackexchange.com/a/156255
 
+
 def get_gz_scene_bounds(fn):
     assert _exists(fn), fn
     assert fn.endswith('.tar.gz')
@@ -89,6 +90,10 @@ class LandSatScene(object):
         self.product_id = product_id
         self.fn = fn
         self._d = d
+
+    @property
+    def bands(self):
+        return [k for k in self._d.keys() if k != '.xml']
 
     def __del__(self):
         for key, ds in self._d.items():
@@ -587,11 +592,21 @@ class LandSatScene(object):
         outdir = _join(outdir, self.product_id)
 
         if bands is None:
-            bands = ['pixel_qa', 'sr_ndvi', 'sr_nbr', 'sr_nbr2',
-                     'sr_aerosol', 'sr_nbr', 'sr_atmos_opacity',
-                     'sr_evi', 'sr_band1', 'sr_band2', 'sr_band3',
-                     'sr_band4', 'sr_band5', 'sr_band6',
-                     'sr_band7']
+            bands = self.bands
+            bands = [k for k in bands if 'toa' not in k]
+            bands = [k for k in bands if 'sensor' not in k]
+            bands = [k for k in bands if 'solar' not in k]
+            bands = [k for k in bands if 'b1' not in k]
+            bands = [k for k in bands if 'b2' not in k]
+            bands = [k for k in bands if 'b3' not in k]
+            bands = [k for k in bands if 'b4' not in k]
+            bands = [k for k in bands if 'b5' not in k]
+            bands = [k for k in bands if 'b6' not in k]
+            bands = [k for k in bands if 'b61' not in k]
+            bands = [k for k in bands if 'b62' not in k]
+            bands = [k for k in bands if 'b7' not in k]
+            bands = [k for k in bands if 'b8' not in k]
+            bands = [k for k in bands if 'bt_band6' not in k]
 
         from rasterio.windows import Window
 

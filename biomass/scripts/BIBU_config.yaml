@@ -1,0 +1,52 @@
+# GandG Base
+
+# multiple models can be defined. e.g. Herbaceous and Shrub
+models:
+    - name: Herbaceous
+      satellite_pars:
+          - satellite: 8
+            ndvi_threshold: 0.31
+            summer_int: -133.2
+            summer_slp: 1401.2
+            fall_int: -157.0
+            fall_slp: 1364.4
+            required_coverage: 0.5
+            minimum_area_ha: 1.8
+          - satellite: 7
+            ndvi_threshold: 0.31
+            summer_int: -133.2
+            summer_slp: 1401.2
+            fall_int: -157.0
+            fall_slp: 1364.4
+            required_coverage: 0.5
+            minimum_area_ha: 1.8
+          - satellite: 5
+            ndvi_threshold: 0.31
+            summer_int: -133.2
+            summer_slp: 1401.2
+            fall_int: -157.0
+            fall_slp: 1364.4
+            required_coverage: 0.5
+            minimum_area_ha: 1.8
+
+# shapefile containing pastures to analyze
+sf_fn: /space/rangesat/BIBU/vector_data/pastures.shp
+
+# primary key for pastures in shapefile
+# e.g. key = feature['properties'][sf_feature_properties_key]
+sf_feature_properties_key: PastID_Key
+
+sf_feature_properties_delimiter: '+'
+
+# location to place cropped landsat scenes and biomass rasters
+out_dir: /space/rangesat/BIBU/analyzed_rasters
+
+# directory containing extracted landsat scenes
+landsat_scene_directory: {GEODATA}/torch-landsat
+
+# path rows that should be skipped
+wrs_blacklist: []
+
+wrs_whitelist: ['040030', '039030']
+
+years: [2019, 2018]
