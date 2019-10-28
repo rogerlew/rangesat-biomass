@@ -4,12 +4,16 @@ import requests
 import shutil
 from enum import Enum
 import os
+import sys
 from os.path import join as _join
 from os.path import exists, dirname
 
 import numpy as np
 
 import netCDF4
+
+sys.path.insert(0, '/var/www/rangesat-biomass')
+sys.path.insert(0, '/Users/roger/rangesat-biomass')
 
 from all_your_base import SCRATCH
 from all_your_base.locationinfo import RasterDatasetInterpolator
@@ -98,6 +102,12 @@ def retrieve_timeseries(variables, locations, start_year, end_year, met_dir):
     ll_x, ll_y = min(lons), min(lats)
     ur_x, ur_y = max(lons), max(lats)
 
+    if len(locations) ==  1:
+        ll_x -= 0.04
+        ll_y -= 0.04
+        ur_x += 0.04
+        ur_y += 0.04
+
     bbox = [ll_x, ur_y, ur_x, ll_y]
 
     start_year = int(start_year)
@@ -105,13 +115,10 @@ def retrieve_timeseries(variables, locations, start_year, end_year, met_dir):
 
     assert start_year <= end_year
 
-    #d = {}
     for gridvariable in variables:
         for year in range(start_year, end_year + 1):
-            print('acquiring', gridvariable, year, bbox)
             id = _retrieve(gridvariable, bbox, year)
             fn = _join(SCRATCH, '%s.nc' % id)
-            print('extracting locations from', fn)
 
             try:
                 _d = nc_extract(fn, locations)
@@ -121,21 +128,24 @@ def retrieve_timeseries(variables, locations, start_year, end_year, met_dir):
                 variable = ds.variables[variable_name]
                 desc = variable.description
                 units = variable.units
+                scale_factor = getattr(variable, 'scale_factor', 1.0)
+                add_offset = getattr(variable, 'add_offset', 0.0)
 
-                if _d is None:
-                    for key in locations:
-                        dump(abbrv, year, key, None, desc, units, met_dir)
-                        #lon, lat = locations[key]
-                        #d['{}-{}-{}'.format(abbrv, year, key)] = (None, desc, units)
-                else:
+                if _d is not None:
                     for key, ts in _d.items():
                         ts = np.array(ts, dtype=np.float64)
-                        ts *= variable.scale_factor
-                        ts += variable.add_offset
-                        ts -= 273.15
+                        ts *= scale_factor
+                        ts += add_offset
+                        units = variable.units
+                        if 'K' == variable.units:
+                            ts -= 273.15
+                            units = 'C'
+
                         dump(abbrv, year, key, ts, desc, units, met_dir)
                         #ts = [int(x) for x in ts]
                         #d['{}-{}-{}'.format(abbrv, year, key)] = (ts, desc, units)
+
+                os.remove(fn)
             except:
                 os.remove(fn)
                 raise
@@ -143,28 +153,33 @@ def retrieve_timeseries(variables, locations, start_year, end_year, met_dir):
 
 
 if __name__ == "__main__":
-    from api.app import RANGESAT_DIR, Location
+    from api.app import RANGESAT_DIRS, Location
     import os
 
     location = 'Zumwalt'
 
-    loc_path = _join(RANGESAT_DIR, location)
-    if exists(loc_path):
-        _location = Location(loc_path)
+    _location = None
+    for rangesat_dir in RANGESAT_DIRS:
+        loc_path = _join(rangesat_dir, location)
+        if exists(loc_path):
+            _location = Location(loc_path)
+            break
 
-        ranches = _location.ranches
+    assert _location is not None
 
-        geo_locations = {}
-        for ranch in ranches:
-            _ranch = _location.serialized_ranch(ranch)
-            pastures = _ranch['pastures']
+    ranches = _location.ranches
 
-            for pasture in pastures:
-                #print(pasture, ranch)
-                _pasture = _location.serialized_pasture(ranch, pasture)
-                ranch = ranch.replace("'", "~").replace(' ', '_')
-                pasture = pasture.replace("'", "~").replace(' ', '_')
-                geo_locations[(pasture, ranch)] = _pasture['centroid']
+    geo_locations = {}
+    for ranch in ranches:
+        _ranch = _location.serialized_ranch(ranch)
+        pastures = _ranch['pastures']
+
+        for pasture in pastures:
+            #print(pasture, ranch)
+            _pasture = _location.serialized_pasture(ranch, pasture)
+            ranch = ranch.replace("'", "~").replace(' ', '_')
+            pasture = pasture.replace("'", "~").replace(' ', '_')
+            geo_locations[(pasture, ranch)] = _pasture['centroid']
 
     start_year = 1979
     end_year = 2019
