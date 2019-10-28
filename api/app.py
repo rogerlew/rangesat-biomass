@@ -24,6 +24,7 @@ from database.pasturestats import (
     query_pasture_stats,
     query_singleyear_pasture_stats,
     query_intrayear_pasture_stats,
+    query_singleyearmonthly_pasture_stats,
     query_seasonalprogression_pasture_stats,
     query_interyear_pasture_stats,
     query_multiyear_pasture_stats
@@ -32,6 +33,7 @@ from database.pasturestats import (
 from database.gridmet import (
     load_gridmet_all_years,
     load_gridmet_single_year,
+    load_gridmet_single_year_monthly,
     load_gridmet_annual_progression
 )
 
@@ -62,11 +64,14 @@ def index():
                 'raster/<location>/<product_id>/<product:{ndvi,nbr,nbr2,biomass,fall_vi,summer_vi}>'],
             pasturestats=[
                 'pasturestats/<location>/?ranch=<ranch>&pasture=<pasture>&acquisition_date=<acquisition_date>',
+                'pasturestats/single-year/<location>/?ranch=<ranch>&pasture=<pasture>&year=<year>&start_date=<start_date>&end_date=<end_date>',
+                'pasturestats/single-year-monthly/<location>/?ranch=<ranch>&pasture=<pasture>&year=<year>&start_date=<start_date>&end_date=<end_date>',
                 'pasturestats/intra-year/<location>/?ranch=<ranch>&pasture=<pasture>&year=<year>&start_date=<start_date>&end_date=<end_date>',
                 'pasturestats/inter-year/<location>/?ranch=<ranch>&pasture=<pasture>&start_year=<start_year>&end_year=<end_year>&start_date=<start_date>&end_date=<end_date>',
                 'pasturestats/multi-year/<location>/?ranch=<ranch>&pasture=<pasture>&start_year=<start_year>&end_year=<end_year>&start_date=<start_date>&end_date=<end_date>'],
             gridmet=[
                 'gridmet/single-year/<location>/<ranch>/<pasture>?year=<year>',
+                'gridmet/single-year-monthly/<location>/<ranch>/<pasture>?year=<year>',
                 'gridmet/multi-year/<location>/<ranch>/<pasture>?start_year=<start_year>&end_year=<end-year>',
                 'gridmet/annual-year/<location>/<ranch>/<pasture>?start_year=<start_year>&end_year=<end-year>'],
             histogram=[
@@ -437,6 +442,30 @@ def intrayear_pasturestats(location):
     return jsonify(None)
 
 
+@app.route('/pasturestats/single-year-monthly/<location>')
+@app.route('/pasturestats/single-year-monthly/<location>/')
+def singleyearmonthly_pasturestats(location):
+    ranch = request.args.get('ranch', None)
+    pasture = request.args.get('pasture', None)
+    year = request.args.get('year', None)
+    agg_func = _get_agg_func(request.args.get('agg_func', 'mean'))
+
+    if agg_func is None:
+        return jsonify(None)
+
+    for rangesat_dir in RANGESAT_DIRS:
+        loc_path = _join(rangesat_dir, location)
+        if exists(loc_path):
+            _location = Location(loc_path)
+            db_fn = _location.db_fn
+
+            return jsonify(query_singleyearmonthly_pasture_stats(db_fn, ranch=ranch, pasture=pasture, year=year,
+                                                                agg_func=agg_func,
+                                                                key_delimiter=_location.key_delimiter))
+
+    return jsonify(None)
+
+
 @app.route('/pasturestats/seasonal-progression/<location>')
 @app.route('/pasturestats/seasonal-progression/<location>/')
 def seasonalprogression_pasturestats(location):
@@ -548,6 +577,24 @@ def gridmet_singleyear_pasture(location, ranch, pasture):
             ranch = ranch.replace("'", "~").replace(' ', '_')
             pasture = pasture.replace("'", "~").replace(' ', '_')
             d = load_gridmet_single_year(_join(_location.loc_path, 'gridmet', ranch, pasture), year)
+            return jsonify(d)
+
+    return jsonify(None)
+
+
+@app.route('/gridmet/single-year-monthly/<location>/<ranch>/<pasture>')
+@app.route('/gridmet/single-year-monthly/<location>/<ranch>/<pasture>/')
+def gridmet_singleyearmonthly_pasture(location, ranch, pasture):
+    year = request.args.get('year', datetime.now().year)
+    year = int(year)
+
+    for rangesat_dir in RANGESAT_DIRS:
+        loc_path = _join(rangesat_dir, location)
+        if exists(loc_path):
+            _location = Location(loc_path)
+            ranch = ranch.replace("'", "~").replace(' ', '_')
+            pasture = pasture.replace("'", "~").replace(' ', '_')
+            d = load_gridmet_single_year_monthly(_join(_location.loc_path, 'gridmet', ranch, pasture), year)
             return jsonify(d)
 
     return jsonify(None)
