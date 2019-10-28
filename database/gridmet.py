@@ -4,7 +4,7 @@ from os.path import split as _split
 from os.path import isdir, exists
 from datetime import date, timedelta, datetime
 from math import sqrt
-
+import math
 import numpy as np
 
 _variables = ('pr', 'tmmn', 'tmmx', 'srad', 'pdsi', 'pet', 'bi')
@@ -30,8 +30,59 @@ def load_gridmet_single_year(directory, year):
 
     if d['pr'] is not None:
         d['dates'] = [str(date(int(year), 1, 1) + timedelta(i)) for i, _ in enumerate(d['pr'])]
+        d['cum_pr'] = list(np.cumsum(d['pr']))
 
     return d
+
+
+_month_labels = ['January', 'February', 'March', 'April', 'May', 'June',
+                'July', 'August', 'September', 'October', 'November', 'December']
+
+
+def load_gridmet_single_year_monthly(directory, year, agg_func=np.mean):
+
+    d = {}
+    for var in _variables:
+        fn = _join(directory, str(year), '%s.npy' % var)
+        if exists(fn):
+            d[var] = [float(x) for x in list(np.load(fn))]
+        else:
+            d[var] = None
+
+    if d['pr'] is not None:
+        d['dates'] = [str(date(int(year), 1, 1) + timedelta(i)) for i, _ in enumerate(d['pr'])]
+        d['cum_pr'] = list(np.cumsum(d['pr']))
+
+    _dates = [date(int(year), 1, 1) + timedelta(i) for i, _ in enumerate(d['pr'])]
+
+    _d = {}
+    for var in _variables:
+        _d[var] = []
+        for mo in range(1, 13):
+            res = [v for j, v in enumerate(d[var]) if int(_dates[j].month) == int(mo)]
+            res = agg_func(res)
+            if math.isnan(res):
+                res = None
+            _d[var].append(res)
+
+    _d['cum_pr'] = []
+    for mo in range(1, 13):
+        res = [v for j, v in enumerate(d['pr']) if _dates[j].month == mo]
+        if len(res) == 0:
+            res = None
+        else:
+            res = np.sum(res)
+
+        if res is not None:
+            if math.isnan(res):
+                res = None
+
+        _d['cum_pr'].append(res)
+
+    _d['months'] = _month_labels
+    _d['year'] = year
+
+    return _d
 
 
 def load_gridmet_all_years(directory, start_year=None, end_year=None):

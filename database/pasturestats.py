@@ -11,6 +11,8 @@ import math
 
 import numpy as np
 
+from datetime import datetime
+
 
 _month_labels = ['January', 'February', 'March', 'April', 'May', 'June',
                 'July', 'August', 'September', 'October', 'November', 'December']
@@ -99,6 +101,12 @@ def query_pasture_stats(db_fn, ranch=None, acquisition_date=None, pasture=None):
 def query_singleyear_pasture_stats(db_fn, ranch=None, pasture=None, year=None,
                                   start_date=None, end_date=None, agg_func=np.mean,
                                   key_delimiter='+'):
+    if start_date is None:
+        start_date = '1-1'
+
+    if end_date is None:
+        end_date = '12-31'
+
     conn = sqlite3.connect(db_fn)
     c = conn.cursor()
 
@@ -163,6 +171,41 @@ def query_intrayear_pasture_stats(db_fn, ranch=None, pasture=None, year=None,
     return agg
 
 
+def query_singleyearmonthly_pasture_stats(db_fn, ranch=None, pasture=None, year=None,
+                                         agg_func=np.mean,
+                                         key_delimiter='+'):
+    rows = query_singleyear_pasture_stats(db_fn, ranch=ranch, pasture=pasture, year=year,
+                                          start_date=None, end_date=None, agg_func=agg_func,
+                                          key_delimiter=key_delimiter)
+
+    keys = set(row['key'] for row in rows)
+
+    monthlies = {key: [[] for i in range(12)] for key in keys}
+    for i, row in enumerate(rows):
+        if row['biomass_mean_gpm'] is None:
+            continue
+
+        month_indx = int(row['acquisition_date'].split('-')[1]) - 1
+
+        assert 0 <= month_indx <= 11, month_indx
+        monthlies[row['key']][month_indx].append(row)
+
+    agg = {}
+    for key in keys:
+        _pasture, _ranch = key.split(key_delimiter)
+        _monthlies = []
+
+        for i, d in enumerate(monthlies[key]):
+            _monthlies.append(_aggregate(d, agg_func))
+            _monthlies[-1]['pasture'] = _pasture
+            _monthlies[-1]['ranch'] = _ranch
+            _monthlies[-1]['month'] = _month_labels[i]
+
+        agg[key] = _monthlies
+
+    return agg
+
+
 def query_seasonalprogression_pasture_stats(db_fn, ranch=None, pasture=None, agg_func=np.mean,
                                   key_delimiter='+'):
     conn = sqlite3.connect(db_fn)
@@ -201,21 +244,6 @@ def query_seasonalprogression_pasture_stats(db_fn, ranch=None, pasture=None, agg
 
         assert 0 <= month_indx <= 11, month_indx
         monthlies[row['key']][month_indx].append(row)
-
-#    agg = []
-#    for key in keys:
-#        _pasture, _ranch = key.split(key_delimiter)
-#        _monthlies = []
-#
-#        for d in monthlies[key]:
-#            _monthlies.append(_aggregate(d, agg_func))
-#            _monthlies[-1]['pasture'] = _pasture
-#            _monthlies[-1]['ranch'] = _ranch
-#
-#        agg.append(_monthlies)
-#
-#    return agg
-
 
     agg = {}
     for key in keys:
@@ -295,6 +323,17 @@ def query_interyear_pasture_stats(db_fn, ranch=None, pasture=None, start_year=No
 def query_multiyear_pasture_stats(db_fn, ranch=None, pasture=None, start_year=None, end_year=None,
                                   start_date=None, end_date=None, agg_func=np.mean,
                                   key_delimiter='+'):
+    if end_year is None:
+        end_year = datetime.now().year
+    if start_year is None:
+        start_year = 1981
+
+    if start_date is None:
+        start_date = '1-1'
+
+    if end_date is None:
+        end_date = '12-31'
+
     conn = sqlite3.connect(db_fn)
     c = conn.cursor()
 
@@ -328,6 +367,9 @@ def query_multiyear_pasture_stats(db_fn, ranch=None, pasture=None, start_year=No
         _start_date = date(*map(int, '{}-{}'.format(year, start_date).split('-')))
         _end_date = date(*map(int, '{}-{}'.format(year, end_date).split('-')))
         mask = [_start_date < d < _end_date for d in dates]
+        if not any(mask):
+            continue
+
         _rows = [dict(zip(_header, row)) for m, row in zip(mask, rows) if m]
         _rows = [d for d in _rows if d['biomass_mean_gpm'] is not None]
 
