@@ -12,6 +12,7 @@ import os
 import uuid
 import numpy as np
 from ast import literal_eval
+from csv import DictWriter
 
 import fiona
 import rasterio
@@ -34,11 +35,12 @@ from database.gridmet import (
     load_gridmet_all_years,
     load_gridmet_single_year,
     load_gridmet_single_year_monthly,
-    load_gridmet_annual_progression
+    load_gridmet_annual_progression,
+    load_gridmet_annual_progression_monthly
 )
 
 from biomass.landsat import LandSatScene
-
+from biomass.raster_processing import make_raster_difference, make_aggregated_rasters
 
 app = Flask(__name__)
 
@@ -62,6 +64,10 @@ def index():
                 'scenemeta/<location>/<product_id>'],
             raster=[
                 'raster/<location>/<product_id>/<product:{ndvi,nbr,nbr2,biomass,fall_vi,summer_vi}>'],
+            rasterprocessing=[
+                'raster-processing/difference/<location>/<product:{ndvi,nbr,nbr2,biomass,fall_vi,summer_vi}>?product_id=<product_id>&product_id2=<product_id2>&',
+                'raster-processing/intra-year/<location>/<product:{ndvi,nbr,nbr2,biomass,fall_vi,summer_vi}>?year=<year>&start_date=<start_date>&end_date=<end_date>',
+                'raster-processing/inter-year/<location>/<product:{ndvi,nbr,nbr2,biomass,fall_vi,summer_vi}>?start_year=<start_year>&end_year=<end_year>&start_date=<start_date>&end_date=<end_date>'],
             pasturestats=[
                 'pasturestats/<location>/?ranch=<ranch>&pasture=<pasture>&acquisition_date=<acquisition_date>',
                 'pasturestats/single-year/<location>/?ranch=<ranch>&pasture=<pasture>&year=<year>&start_date=<start_date>&end_date=<end_date>',
@@ -73,7 +79,8 @@ def index():
                 'gridmet/single-year/<location>/<ranch>/<pasture>?year=<year>',
                 'gridmet/single-year-monthly/<location>/<ranch>/<pasture>?year=<year>',
                 'gridmet/multi-year/<location>/<ranch>/<pasture>?start_year=<start_year>&end_year=<end-year>',
-                'gridmet/annual-year/<location>/<ranch>/<pasture>?start_year=<start_year>&end_year=<end-year>'],
+                'gridmet/annual-progression/<location>/<ranch>/<pasture>?start_year=<start_year>&end_year=<end-year>',
+                'gridmet/annual-progression-monthly/<location>/<ranch>/<pasture>?start_year=<start_year>&end_year=<end-year>'],
             histogram=[
                 'histogram/single-scene/<location>/<ranch>/<pasture>?product_id=<product_id>&product=<product>',
                 'histogram/intra-year/<location>/<ranch>/<pasture>?year=<year>&start_date=<start_date>&end_date=<end_date>&product=<product>',
@@ -181,7 +188,7 @@ def _scene_sorter(fns):
     return sorted(fns, key=lambda fn: int(fn.split('_')[3]))
 
 
-def _scenemeta_location_intrayear(location, year, start_date, end_date):
+def _scenemeta_location_intrayear(location, year, start_date, end_date, rowpath=None):
     for rangesat_dir in RANGESAT_DIRS:
         loc_path = _join(rangesat_dir, location)
         if exists(loc_path):
@@ -201,12 +208,16 @@ def _scenemeta_location_intrayear(location, year, start_date, end_date):
                 if not m:
                     continue
 
+                if rowpath is not None:
+                    if rowpath != fn.split('_')[2]:
+                        continue
+
                 fns.append(fn)
 
             return _scene_sorter(fns)
 
 
-def _scenemeta_location_interyear(location, start_year, end_year, start_date, end_date):
+def _scenemeta_location_interyear(location, start_year, end_year, start_date, end_date, rowpath=None):
     for rangesat_dir in RANGESAT_DIRS:
         loc_path = _join(rangesat_dir, location)
         if exists(loc_path):
@@ -234,6 +245,10 @@ def _scenemeta_location_interyear(location, start_year, end_year, start_date, en
             for fn, m in zip(ls_fns, mask):
                 if not m:
                     continue
+
+                if rowpath is not None:
+                    if rowpath != fn.split('_')[2]:
+                        continue
 
                 fns.append(fn)
 
@@ -307,6 +322,7 @@ def scenemeta_location_product_id(location, product_id):
 @app.route('/raster/<location>/<product_id>/<product>/')
 def raster(location, product_id, product):
     ranches = request.args.get('ranches', None)
+    utm = request.args.get('utm', False)
 
     for rangesat_dir in RANGESAT_DIRS:
         loc_path = _join(rangesat_dir, location)
@@ -315,17 +331,27 @@ def raster(location, product_id, product):
             out_dir = _location.out_dir
 
             fn = []
-            if product in ['ndvi', 'nbr', 'nbr2', 'pixel_qa', 'rgb']:
-                fn = glob(_join(out_dir, product_id, '*{}.wgs.tif'.format(product)))
+            if not utm:
+                if product in ['ndvi', 'nbr', 'nbr2', 'pixel_qa', 'rgb', 'aerosol']:
+                    fn = glob(_join(out_dir, product_id, '*{}.wgs.tif'.format(product)))
 
-            elif product in ['biomass', 'fall_vi', 'summer_vi']:
-                fn = glob(_join(out_dir, product_id, 'biomass/*{}.wgs.tif'.format(product)))
+                elif product in ['biomass', 'fall_vi', 'summer_vi']:
+                    fn = glob(_join(out_dir, product_id, 'biomass/*{}.wgs.tif'.format(product)))
+            else:
+                if product in ['ndvi', 'nbr', 'nbr2', 'pixel_qa', 'rgb', 'aerosol']:
+                    fn = glob(_join(out_dir, product_id, '*{}.tif'.format(product)))
+
+                elif product in ['biomass', 'fall_vi', 'summer_vi']:
+                    fn = glob(_join(out_dir, product_id, 'biomass/*{}.tif'.format(product)))
 
             if len(fn) != 1:
                 return jsonify(None)
             fn = fn[0]
 
-            file_name = '{product_id}__{product}.wgs.tif'.format(product_id=product_id, product=product)
+            if not utm:
+                file_name = '{product_id}__{product}.wgs.tif'.format(product_id=product_id, product=product)
+            else:
+                file_name = '{product_id}__{product}.tif'.format(product_id=product_id, product=product)
 
             if ranches is None:
                 return send_file(fn, as_attachment=True, attachment_filename=file_name)
@@ -350,12 +376,279 @@ def raster(location, product_id, product):
     return jsonify(None)
 
 
+@app.route('/raster-processing/intra-year/<location>/<product>')
+@app.route('/raster-processing/intra-year/<location>/<product>/')
+def intrayear_rasterprocessing(location, product):
+    ranches = request.args.get('ranches', None)
+    rowpath = request.args.get('rowpath', None)
+    year = request.args.get('year', None)
+    start_date = request.args.get('start_date', None)
+    end_date = request.args.get('end_date', None)
+
+    for rangesat_dir in RANGESAT_DIRS:
+        loc_path = _join(rangesat_dir, location)
+        if exists(loc_path):
+            _location = Location(loc_path)
+            out_dir = _location.out_dir
+
+            product_ids = _scenemeta_location_intrayear(location, year, start_date, end_date, rowpath=rowpath)
+
+            fns = []
+            for product_id in product_ids:
+
+                if product in ['ndvi', 'nbr', 'nbr2', 'pixel_qa']:
+                    fn = glob(_join(out_dir, product_id, '*{}.tif'.format(product)))
+                elif product in ['biomass', 'fall_vi', 'summer_vi']:
+                    fn = glob(_join(out_dir, product_id, 'biomass/*{}.tif'.format(product)))
+                else:
+                    return jsonify(None)
+
+                if len(fn) != 1:
+                    continue
+                fn = fn[0]
+                fns.append(fn)
+
+            if ranches is not None:
+                ranches = literal_eval(ranches)
+
+                assert exists(fn.replace('.wgs.tif', '.tif'))
+
+                _fns = []
+                for fn in _fns:
+                    head, tail = _split(fn)
+                    _fn = _join(SCRATCH, tail)
+                    _location.mask_ranches(fn.replace('.wgs.tif', '.tif'), ranches, _fn)
+                    _fns.append(_fn)
+
+                fns = _fns
+
+            file_name = 'agg_{}.tif'.format(product)
+            file_path = os.path.abspath(_join(SCRATCH, file_name))
+
+            @after_this_request
+            def remove_file(response):
+                try:
+                    os.remove(file_path)
+                except Exception as error:
+                    app.logger.error("Error removing or closing downloaded file handle", error)
+
+                if ranches is not None:
+                    for _fn in fns:
+                        if SCRATCH in _fn:
+                            os.remove(_fn)
+
+                return response
+
+            make_aggregated_rasters(fns, dst_fn=file_path)
+            return send_file(file_path, as_attachment=True, attachment_filename=file_name)
+
+    return jsonify(None)
+
+
+# https://rangesat.nkn.uidaho.edu/api/raster-processing/inter-year/Zumwalt/biomass?start_year=2016&end_year=2018&start_date=5-1&end_date=8-30
+@app.route('/raster-processing/inter-year/<location>/<product>')
+@app.route('/raster-processing/inter-year/<location>/<product>/')
+def interyear_rasterprocessing(location, product):
+    ranches = request.args.get('ranches', None)
+    rowpath = request.args.get('rowpath', None)
+    start_year = request.args.get('start_year', None)
+    end_year = request.args.get('end_year', None)
+    start_date = request.args.get('start_date', None)
+    end_date = request.args.get('end_date', None)
+
+    for rangesat_dir in RANGESAT_DIRS:
+        loc_path = _join(rangesat_dir, location)
+        if exists(loc_path):
+            _location = Location(loc_path)
+            out_dir = _location.out_dir
+
+            product_ids = _scenemeta_location_interyear(location, start_year, end_year, start_date, end_date, rowpath=rowpath)
+
+            fns = []
+            for product_id in product_ids:
+
+                if product in ['ndvi', 'nbr', 'nbr2', 'pixel_qa']:
+                    fn = glob(_join(out_dir, product_id, '*{}.tif'.format(product)))
+
+                elif product in ['biomass', 'fall_vi', 'summer_vi']:
+                    fn = glob(_join(out_dir, product_id, 'biomass/*{}.tif'.format(product)))
+                else:
+                    return jsonify(None)
+
+                if len(fn) != 1:
+                    continue
+                fn = fn[0]
+                fns.append(fn)
+
+            if ranches is not None:
+                ranches = literal_eval(ranches)
+
+                assert exists(fn.replace('.wgs.tif', '.tif'))
+
+                _fns = []
+                for fn in _fns:
+                    head, tail = _split(fn)
+                    _fn = _join(SCRATCH, tail)
+                    _location.mask_ranches(fn.replace('.wgs.tif', '.tif'), ranches, _fn)
+                    _fns.append(_fn)
+
+                fns = _fns
+
+            file_name = 'agg_{}.tif'.format(product)
+            file_path = os.path.abspath(_join(SCRATCH, file_name))
+
+            @after_this_request
+            def remove_file(response):
+                try:
+                    os.remove(file_path)
+                except Exception as error:
+                    app.logger.error("Error removing or closing downloaded file handle", error)
+
+                if ranches is not None:
+                    for _fn in fns:
+                        if SCRATCH in _fn:
+                            os.remove(_fn)
+
+                return response
+
+            make_aggregated_rasters(fns, dst_fn=file_path)
+            return send_file(file_path, as_attachment=True, attachment_filename=file_name)
+
+    return jsonify(None)
+
+
+@app.route('/raster-processing/difference/<location>/<product>')
+@app.route('/raster-processing/difference/<location>/<product>/')
+def raster_difference(location, product):
+    ranches = request.args.get('ranches', None)
+    utm = request.args.get('utm', False)
+    product_id = request.args.get('product_id', None)
+    product_id2 = request.args.get('product_id2', _scenemeta_location_latest(location))
+
+    assert product_id is not None
+    assert product_id2 is not None
+
+    for rangesat_dir in RANGESAT_DIRS:
+        loc_path = _join(rangesat_dir, location)
+        if exists(loc_path):
+            _location = Location(loc_path)
+            out_dir = _location.out_dir
+
+            fn = []
+            if not utm:
+                if product in ['ndvi', 'nbr', 'nbr2', 'pixel_qa', 'rgb', 'aerosol']:
+                    fn = glob(_join(out_dir, product_id, '*{}.wgs.tif'.format(product)))
+
+                elif product in ['biomass', 'fall_vi', 'summer_vi']:
+                    fn = glob(_join(out_dir, product_id, 'biomass/*{}.wgs.tif'.format(product)))
+            else:
+                if product in ['ndvi', 'nbr', 'nbr2', 'pixel_qa', 'rgb', 'aerosol']:
+                    fn = glob(_join(out_dir, product_id, '*{}.tif'.format(product)))
+
+                elif product in ['biomass', 'fall_vi', 'summer_vi']:
+                    fn = glob(_join(out_dir, product_id, 'biomass/*{}.tif'.format(product)))
+
+            if len(fn) != 1:
+                return jsonify(None)
+            fn = fn[0]
+
+            if ranches is not None:
+                ranches = literal_eval(ranches)
+                assert exists(fn.replace('.wgs.tif', '.tif'))
+
+                _fn = os.path.abspath(_join(SCRATCH, '%s.tif' % uuid.uuid4()))
+                _location.mask_ranches(fn.replace('.wgs.tif', '.tif'), ranches, _fn)
+                fn = _fn
+
+            fn2 = []
+            if not utm:
+                if product in ['ndvi', 'nbr', 'nbr2', 'pixel_qa', 'rgb', 'aerosol']:
+                    fn2 = glob(_join(out_dir, product_id2, '*{}.wgs.tif'.format(product)))
+
+                elif product in ['biomass', 'fall_vi', 'summer_vi']:
+                    fn2 = glob(_join(out_dir, product_id2, 'biomass/*{}.wgs.tif'.format(product)))
+            else:
+                if product in ['ndvi', 'nbr', 'nbr2', 'pixel_qa', 'rgb', 'aerosol']:
+                    fn2 = glob(_join(out_dir, product_id2, '*{}.tif'.format(product)))
+
+                elif product in ['biomass', 'fall_vi', 'summer_vi']:
+                    fn2 = glob(_join(out_dir, product_id2, 'biomass/*{}.tif'.format(product)))
+
+            if len(fn2) != 1:
+                return jsonify(None)
+            fn2 = fn2[0]
+
+            if ranches is not None:
+                ranches = literal_eval(ranches)
+                assert exists(fn.replace('.wgs.tif', '.tif'))
+
+                _fn2 = os.path.abspath(_join(SCRATCH, '%s.tif' % uuid.uuid4()))
+                _location.mask_ranches(fn2.replace('.wgs.tif', '.tif'), ranches, _fn2)
+                fn2 = _fn2
+
+            if not utm:
+                file_name = '{product_id2}-{product_id}__{product}.wgs.tif'\
+                            .format(product_id=product_id, product_id2=product_id2, product=product)
+            else:
+                file_name = '{product_id2}-{product_id}__{product}.tif'\
+                            .format(product_id=product_id, product_id2=product_id2, product=product)
+
+            file_path = _join(SCRATCH, file_name)
+
+            make_raster_difference(fn, fn2, file_path)
+
+            @after_this_request
+            def remove_file(response):
+                try:
+                    os.remove(file_path)
+                except Exception as error:
+                    app.logger.error("Error removing or closing downloaded file handle", error)
+                return response
+
+            return send_file(file_path, as_attachment=True, attachment_filename=file_name)
+
+    return jsonify(None)
+
+
+def _handle_pasturestat_request(data, csv):
+    if csv:
+        if isinstance(data, dict):
+            _data = []
+            for value in data.values():
+                _data.extend(value)
+            data = _data
+
+        file_name = '%s.csv' % uuid.uuid4()
+        file_path = _join(SCRATCH, file_name)
+        fieldnames = list(data[0].keys())
+
+        with open(file_path, 'w') as fp:
+            csv_wtr = DictWriter(fp, fieldnames=fieldnames)
+            csv_wtr.writeheader()
+            csv_wtr.writerows(data)
+
+        @after_this_request
+        def remove_file(response):
+            try:
+                os.remove(file_path)
+            except Exception as error:
+                app.logger.error("Error removing or closing downloaded file handle", error)
+            return response
+
+        return send_file(file_path, as_attachment=True, attachment_filename=file_name)
+
+    else:
+        return jsonify(data)
+
+
 @app.route('/pasturestats/<location>')
 @app.route('/pasturestats/<location>/')
 def pasturestats(location):
+
     ranch = request.args.get('ranch', None)
     pasture = request.args.get('pasture', None)
     acquisition_date = request.args.get('acquisition_date', None)
+    csv = request.args.get('csv', False)
 
     for rangesat_dir in RANGESAT_DIRS:
         loc_path = _join(rangesat_dir, location)
@@ -363,7 +656,8 @@ def pasturestats(location):
             _location = Location(loc_path)
             db_fn = _location.db_fn
 
-            return jsonify(query_pasture_stats(db_fn, ranch=ranch, pasture=pasture, acquisition_date=acquisition_date))
+            data = query_pasture_stats(db_fn, ranch=ranch, pasture=pasture, acquisition_date=acquisition_date)
+            return _handle_pasturestat_request(data, csv)
 
     return jsonify(None)
 
@@ -399,6 +693,7 @@ def singleyear_pasturestats(location):
     start_date = request.args.get('start_date', None)
     end_date = request.args.get('end_date', None)
     agg_func = _get_agg_func(request.args.get('agg_func', 'mean'))
+    csv = request.args.get('csv', False)
 
     if agg_func is None:
         return jsonify(None)
@@ -409,9 +704,10 @@ def singleyear_pasturestats(location):
             _location = Location(loc_path)
             db_fn = _location.db_fn
 
-            return jsonify(query_singleyear_pasture_stats(db_fn, ranch=ranch, pasture=pasture, year=year,
-                                                         start_date=start_date, end_date=end_date, agg_func=agg_func,
-                                                         key_delimiter=_location.key_delimiter))
+            data = query_singleyear_pasture_stats(db_fn, ranch=ranch, pasture=pasture, year=year,
+                                                  start_date=start_date, end_date=end_date, agg_func=agg_func,
+                                                  key_delimiter=_location.key_delimiter)
+            return _handle_pasturestat_request(data, csv)
 
     return jsonify(None)
 
@@ -425,6 +721,7 @@ def intrayear_pasturestats(location):
     start_date = request.args.get('start_date', None)
     end_date = request.args.get('end_date', None)
     agg_func = _get_agg_func(request.args.get('agg_func', 'mean'))
+    csv = request.args.get('csv', False)
 
     if agg_func is None:
         return jsonify(None)
@@ -435,9 +732,10 @@ def intrayear_pasturestats(location):
             _location = Location(loc_path)
             db_fn = _location.db_fn
 
-            return jsonify(query_intrayear_pasture_stats(db_fn, ranch=ranch, pasture=pasture, year=year,
-                                                         start_date=start_date, end_date=end_date, agg_func=agg_func,
-                                                         key_delimiter=_location.key_delimiter))
+            data = query_intrayear_pasture_stats(db_fn, ranch=ranch, pasture=pasture, year=year,
+                                                 start_date=start_date, end_date=end_date, agg_func=agg_func,
+                                                 key_delimiter=_location.key_delimiter)
+            return _handle_pasturestat_request(data, csv)
 
     return jsonify(None)
 
@@ -449,6 +747,7 @@ def singleyearmonthly_pasturestats(location):
     pasture = request.args.get('pasture', None)
     year = request.args.get('year', None)
     agg_func = _get_agg_func(request.args.get('agg_func', 'mean'))
+    csv = request.args.get('csv', False)
 
     if agg_func is None:
         return jsonify(None)
@@ -459,9 +758,10 @@ def singleyearmonthly_pasturestats(location):
             _location = Location(loc_path)
             db_fn = _location.db_fn
 
-            return jsonify(query_singleyearmonthly_pasture_stats(db_fn, ranch=ranch, pasture=pasture, year=year,
-                                                                agg_func=agg_func,
-                                                                key_delimiter=_location.key_delimiter))
+            data = query_singleyearmonthly_pasture_stats(db_fn, ranch=ranch, pasture=pasture, year=year,
+                                                         agg_func=agg_func,
+                                                         key_delimiter=_location.key_delimiter)
+            return _handle_pasturestat_request(data, csv)
 
     return jsonify(None)
 
@@ -473,6 +773,8 @@ def seasonalprogression_pasturestats(location):
     pasture = request.args.get('pasture', None)
     year = request.args.get('year', None)
     agg_func = _get_agg_func(request.args.get('agg_func', 'mean'))
+    csv = request.args.get('csv', False)
+    csv = request.args.get('csv', False)
 
     if agg_func is None:
         return jsonify(None)
@@ -483,9 +785,9 @@ def seasonalprogression_pasturestats(location):
             _location = Location(loc_path)
             db_fn = _location.db_fn
 
-            d = query_seasonalprogression_pasture_stats(db_fn, ranch=ranch, pasture=pasture,
-                                                        agg_func=agg_func, key_delimiter=_location.key_delimiter)
-            return jsonify(d)
+            data = query_seasonalprogression_pasture_stats(db_fn, ranch=ranch, pasture=pasture,
+                                                           agg_func=agg_func, key_delimiter=_location.key_delimiter)
+            return _handle_pasturestat_request(data, csv)
 
     return jsonify(None)
 
@@ -500,6 +802,7 @@ def interyear_pasturestats(location):
     start_date = request.args.get('start_date', None)
     end_date = request.args.get('end_date', None)
     agg_func = _get_agg_func(request.args.get('agg_func', 'mean'))
+    csv = request.args.get('csv', False)
 
     if agg_func is None:
         return jsonify(None)
@@ -510,10 +813,11 @@ def interyear_pasturestats(location):
             _location = Location(loc_path)
             db_fn = _location.db_fn
 
-            return jsonify(query_interyear_pasture_stats(db_fn, ranch=ranch, pasture=pasture,
-                                                         start_year=start_year, end_year=end_year,
-                                                         start_date=start_date, end_date=end_date, agg_func=agg_func,
-                                                         key_delimiter=_location.key_delimiter))
+            data = query_interyear_pasture_stats(db_fn, ranch=ranch, pasture=pasture,
+                                                 start_year=start_year, end_year=end_year,
+                                                 start_date=start_date, end_date=end_date, agg_func=agg_func,
+                                                 key_delimiter=_location.key_delimiter)
+            return _handle_pasturestat_request(data, csv)
 
     return jsonify(None)
 
@@ -528,6 +832,7 @@ def multiyear_pasturestats(location):
     start_date = request.args.get('start_date', None)
     end_date = request.args.get('end_date', None)
     agg_func = _get_agg_func(request.args.get('agg_func', 'mean'))
+    csv = request.args.get('csv', False)
 
     if agg_func is None:
         return jsonify(None)
@@ -538,10 +843,11 @@ def multiyear_pasturestats(location):
             _location = Location(loc_path)
             db_fn = _location.db_fn
 
-            return jsonify(query_multiyear_pasture_stats(db_fn, ranch=ranch, pasture=pasture,
-                                                         start_year=start_year, end_year=end_year,
-                                                         start_date=start_date, end_date=end_date, agg_func=agg_func,
-                                                         key_delimiter=_location.key_delimiter))
+            data =query_multiyear_pasture_stats(db_fn, ranch=ranch, pasture=pasture,
+                                                start_year=start_year, end_year=end_year,
+                                                start_date=start_date, end_date=end_date, agg_func=agg_func,
+                                                key_delimiter=_location.key_delimiter)
+            return _handle_pasturestat_request(data, csv)
 
     return jsonify(None)
 
@@ -613,6 +919,24 @@ def gridmet_annualprogression_pasture(location, ranch, pasture):
             ranch = ranch.replace("'", "~").replace(' ', '_')
             pasture = pasture.replace("'", "~").replace(' ', '_')
             d = load_gridmet_annual_progression(_join(_location.loc_path, 'gridmet', ranch, pasture), start_year, end_year)
+            return jsonify(d)
+
+    return jsonify(None)
+
+
+@app.route('/gridmet/annual-progression-monthly/<location>/<ranch>/<pasture>')
+@app.route('/gridmet/annual-progression-monthly/<location>/<ranch>/<pasture>/')
+def gridmet_annualprogression_monthly_pasture(location, ranch, pasture):
+    start_year = request.args.get('start_year', None)
+    end_year = request.args.get('end_year', None)
+
+    for rangesat_dir in RANGESAT_DIRS:
+        loc_path = _join(rangesat_dir, location)
+        if exists(loc_path):
+            _location = Location(loc_path)
+            ranch = ranch.replace("'", "~").replace(' ', '_')
+            pasture = pasture.replace("'", "~").replace(' ', '_')
+            d = load_gridmet_annual_progression_monthly(_join(_location.loc_path, 'gridmet', ranch, pasture), start_year, end_year)
             return jsonify(d)
 
     return jsonify(None)
@@ -691,7 +1015,7 @@ def intrayear_histogram(location, ranch, pasture):
 
             return jsonify(dict(counts=counts, bins=bins, product_ids=product_ids, product=product))
 
-    return None
+    return jsonify(None)
 
 
 @app.route('/histogram/inter-year/<location>/<ranch>/<pasture>')
@@ -734,7 +1058,7 @@ def interyear_histogram(location, ranch, pasture):
 
             return jsonify(dict(counts=counts, bins=bins, product_ids=product_ids, product=product))
 
-    return None
+    return jsonify(None)
 
 
 if __name__ == '__main__':
