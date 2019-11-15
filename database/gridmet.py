@@ -134,3 +134,66 @@ def load_gridmet_annual_progression(directory, start_year=None, end_year=None):
         del d[var]
 
     return d
+
+
+def load_gridmet_annual_progression_monthly(directory, start_year=None, end_year=None,
+                                            agg_func=np.mean):
+    if start_year is None:
+        start_year = 1979
+    if end_year is None:
+        end_year = datetime.now().year
+
+    start_year = int(start_year)
+    end_year = int(end_year)
+
+    d = {var: [] for var in _variables}
+    for year in range(start_year, end_year + 1):
+        _d = load_gridmet_single_year(directory, year)
+        for var in _variables:
+            ts = _d[var]
+            if ts is not None:
+                if len(ts) >= 365:
+                    d[var].append(ts[:365])
+
+    bad = []
+    for var in d:
+        if len(d[var]) > 0:
+            d[var] = np.concatenate(d[var])
+        else:
+            bad.append(var)
+
+    _dates = [date(int(start_year), 1, 1) + timedelta(i) for i, _ in enumerate(d['pr'])]
+
+    _d = {}
+    for var in _variables:
+        if var in bad:
+            continue
+        _d[var] = []
+        for mo in range(1, 13):
+            res = [v for j, v in enumerate(d[var]) if int(_dates[j].month) == int(mo)]
+            res = agg_func(res)
+            if math.isnan(res):
+                res = None
+            _d[var].append(res)
+
+    _d['cum_pr'] = []
+    for mo in range(1, 13):
+        res = [v for j, v in enumerate(d['pr']) if _dates[j].month == mo]
+        if len(res) == 0:
+            res = None
+        else:
+            res = np.sum(res)
+
+        if res is not None:
+            if math.isnan(res):
+                res = None
+
+        _d['cum_pr'].append(res)
+
+    _d['months'] = _month_labels
+    _d['year'] = year
+
+    for var in bad:
+        _d[var] = None
+
+    return _d

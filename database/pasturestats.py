@@ -172,10 +172,20 @@ def query_intrayear_pasture_stats(db_fn, ranch=None, pasture=None, year=None,
 
 
 def query_singleyearmonthly_pasture_stats(db_fn, ranch=None, pasture=None, year=None,
+                                          start_date=None, end_date=None,
                                          agg_func=np.mean,
                                          key_delimiter='+'):
+    if year is None:
+        year = datetime.now().year
+
+    if start_date is None:
+        start_date = '1-1'
+
+    if end_date is None:
+        end_date = '12-31'
+
     rows = query_singleyear_pasture_stats(db_fn, ranch=ranch, pasture=pasture, year=year,
-                                          start_date=None, end_date=None, agg_func=agg_func,
+                                          start_date=start_date, end_date=end_date, agg_func=agg_func,
                                           key_delimiter=key_delimiter)
 
     keys = set(row['key'] for row in rows)
@@ -183,6 +193,12 @@ def query_singleyearmonthly_pasture_stats(db_fn, ranch=None, pasture=None, year=
     monthlies = {key: [[] for i in range(12)] for key in keys}
     for i, row in enumerate(rows):
         if row['biomass_mean_gpm'] is None:
+            continue
+
+        if row['biomass_mean_gpm'] == 0:
+            continue
+
+        if row['coverage'] < 0.5:
             continue
 
         month_indx = int(row['acquisition_date'].split('-')[1]) - 1
@@ -238,6 +254,12 @@ def query_seasonalprogression_pasture_stats(db_fn, ranch=None, pasture=None, agg
     monthlies = {key: [[] for i in range(12)] for key in keys}
     for i, row in enumerate(rows):
         if row['biomass_mean_gpm'] is None:
+            continue
+
+        if row['biomass_mean_gpm'] == 0:
+            continue
+
+        if row['coverage'] < 0.5:
             continue
 
         month_indx = int(row['acquisition_date'].split('-')[1]) - 1
