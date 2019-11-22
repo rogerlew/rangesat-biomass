@@ -72,8 +72,10 @@ class LandSatScene(object):
     def __open_dir(self, fn):
         fns = glob(_join(fn, '*'))
 
-        target_fn = [fn for fn in fns if fn.endswith('.tif')][0]
+        target_fn = [fn for fn in fns if fn.endswith('ndvi.tif')][0]
         product_id = '_'.join(_split(target_fn)[-1].split('_')[:7])
+
+        print('product_id', product_id)
 
         d = {}
         for fn in fns:

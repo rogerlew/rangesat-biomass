@@ -21,6 +21,7 @@ sys.path.insert(0, os.path.abspath('../'))
 
 from all_your_base import GEODATA_DIRS
 
+
 def wkt_2_proj4(wkt):
     srs = osr.SpatialReference()
     srs.ImportFromWkt(wkt)
@@ -94,6 +95,10 @@ class Location(object):
         return _join(self.loc_path, self._d['out_dir'], 'sqlite3.db')
 
     @property
+    def scn_cov_db_fn(self):
+        return _join(self.loc_path, self._d['out_dir'], 'scenemeta_coverage.db')
+
+    @property
     def ranches(self):
         return sorted(list(self.pastures.keys()))
 
@@ -129,6 +134,36 @@ class Location(object):
 
         x = data[np.logical_not(pasture_mask)]
         return [float(x) for x in x[x.mask == False]]
+
+    def get_pasture_indx(self, raster_fn, pasture, ranch):
+        target_ranch = ranch.replace(' ', '_').lower().strip()
+        target_pasture = pasture.replace(' ', '_').lower().strip()
+
+        loc_path = self.loc_path
+        _d = self._d
+
+        sf_fn = _join(loc_path, _d['sf_fn'])
+        sf_feature_properties_key = _d['sf_feature_properties_key']
+        sf_fn = os.path.abspath(sf_fn)
+        sf = fiona.open(sf_fn, 'r')
+
+        features = []
+        for feature in sf:
+            properties = feature['properties']
+            _key = properties[sf_feature_properties_key].replace(' ', '_')
+
+            _pasture, _ranch = _key.split(self.key_delimiter)
+
+            if _ranch.lower() == target_ranch and _pasture.lower() == target_pasture:
+                features.append(feature['geometry'])
+
+        if len(features) == 0:
+            raise KeyError((ranch, pasture))
+
+        ds = rasterio.open(raster_fn)
+        pasture_mask, _, _ = raster_geometry_mask(ds, features)
+        indx = np.where(pasture_mask == False)
+        return indx
 
     def mask_ranches(self, raster_fn, ranches, dst_fn, nodata=-9999):
         """
