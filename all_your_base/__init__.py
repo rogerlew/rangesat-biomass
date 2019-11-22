@@ -11,8 +11,8 @@ import numpy as np
 GEODATA_DIRS = []
 if exists('/geodata'):
     GEODATA_DIRS.append('/geodata')
-if exists('/Users/roger/geodata'):
-    GEODATA_DIRS.append('/Users/roger/geodata')
+if exists('/Volumes/Space/geodata'):
+    GEODATA_DIRS.append('/Volumes/Space/geodata')
 if exists('/space'):
     GEODATA_DIRS.append('/space')
 assert len(GEODATA_DIRS) > 0

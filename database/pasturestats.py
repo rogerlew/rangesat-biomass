@@ -47,6 +47,11 @@ def _aggregate(rows, agg_func):
     return results
 
 
+def _date_of_max(rows, measure='biomass_90pct_gpm'):
+    indx = np.argmax([(row[measure], -99999.0)[row[measure] is None] for row in rows])
+    return rows[indx]
+
+
 def _sortkeypicker(keynames):
     negate = set()
     for i, k in enumerate(keynames):
@@ -62,6 +67,34 @@ def _sortkeypicker(keynames):
         return composite
 
     return getit
+
+
+def query_scene_product_ids(db_fn):
+    conn = sqlite3.connect(db_fn)
+    c = conn.cursor()
+
+    query = 'SELECT product_id FROM pasture_stats'
+
+    c.execute(query)
+    rows = c.fetchall()
+    return sorted(set([row[0] for row in rows]))
+
+
+def query_scenes_coverage(scn_cov_db_fn, product_ids):
+    conn = sqlite3.connect(scn_cov_db_fn)
+    c = conn.cursor()
+
+    query = 'SELECT * FROM scenemeta_coverage'
+
+    c.execute(query)
+    rows = c.fetchall()
+    d = {product_id: coverage for product_id, coverage in rows}
+
+    res = []
+    for product_id in product_ids:
+        res.append(d.get(product_id, 0.0))
+
+    return res
 
 
 def query_pasture_stats(db_fn, ranch=None, acquisition_date=None, pasture=None):
@@ -171,6 +204,28 @@ def query_intrayear_pasture_stats(db_fn, ranch=None, pasture=None, year=None,
     return agg
 
 
+def query_max_pasture_seasonal_pasture_stats(db_fn, ranch=None, pasture=None, year=None,
+                                             start_date=None, end_date=None, measure='biomass_mean_gpm',
+                                             key_delimiter='+'):
+
+    rows = query_singleyear_pasture_stats(db_fn, ranch=ranch, pasture=pasture, year=year,
+                                          start_date=start_date, end_date=end_date, agg_func=None,
+                                          key_delimiter=key_delimiter)
+
+    keys = set(row['key'] for row in rows)
+    d = {key: [] for key in keys}
+
+    for row in rows:
+        d[row['key']].append(row)
+
+    agg = []
+    for key in d:
+        _pasture, _ranch = key.split(key_delimiter)
+        agg.append(_date_of_max(d[key], measure))
+
+    return agg
+
+
 def query_singleyearmonthly_pasture_stats(db_fn, ranch=None, pasture=None, year=None,
                                           start_date=None, end_date=None,
                                          agg_func=np.mean,
@@ -222,8 +277,19 @@ def query_singleyearmonthly_pasture_stats(db_fn, ranch=None, pasture=None, year=
     return agg
 
 
-def query_seasonalprogression_pasture_stats(db_fn, ranch=None, pasture=None, agg_func=np.mean,
-                                  key_delimiter='+'):
+def query_seasonalprogression_pasture_stats(db_fn, ranch=None, pasture=None,
+                                            start_year=None, end_year=None,
+                                            agg_func=np.mean, key_delimiter='+'):
+    if end_year is None:
+        end_year = datetime.now().year
+    else:
+        end_year = int(end_year)
+
+    if start_year is None:
+        start_year = 1981
+    else:
+        start_year = int(start_year)
+
     conn = sqlite3.connect(db_fn)
     c = conn.cursor()
 
@@ -261,8 +327,13 @@ def query_seasonalprogression_pasture_stats(db_fn, ranch=None, pasture=None, agg
 
         if row['coverage'] < 0.5:
             continue
+        acquisition_date = row['acquisition_date']
+        yr, mo, da = map(int, row['acquisition_date'].split('-'))
 
-        month_indx = int(row['acquisition_date'].split('-')[1]) - 1
+        if not start_year <= yr <= end_year:
+            continue
+
+        month_indx = mo - 1
 
         assert 0 <= month_indx <= 11, month_indx
         monthlies[row['key']][month_indx].append(row)
@@ -408,3 +479,8 @@ def query_multiyear_pasture_stats(db_fn, ranch=None, pasture=None, start_year=No
 
     return sorted(agg, key=_sortkeypicker(['ranch', 'pasture', 'year']))
 
+
+if __name__ == "__main__":
+    db_fn = '/Users/roger/Downloads/sqlite3.db'
+    res = query_scene_coverage(db_fn, product_id='LT05_L1TP_042028_20000820_20160922_01_T1')
+    print(res)

@@ -18,7 +18,24 @@ _descriptions = ('precipitation_amount',
                  'burning_index_g')
 
 
-def load_gridmet_single_year(directory, year):
+_days_in_mo = np.array([31, 28.25, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31])
+
+
+def c_to_f(x):
+    if x is None:
+        return None
+
+    return 9.0/5.0 * x + 32.0
+
+
+def mm_to_in(x):
+    if x is None:
+        return None
+
+    return x / 25.4
+
+
+def load_gridmet_single_year(directory, year, units='SI'):
 
     d = {}
     for var in _variables:
@@ -32,14 +49,24 @@ def load_gridmet_single_year(directory, year):
         d['dates'] = [str(date(int(year), 1, 1) + timedelta(i)) for i, _ in enumerate(d['pr'])]
         d['cum_pr'] = list(np.cumsum(d['pr']))
 
+    if d['pr'] is not None and d['pet'] is not None:
+        d['pwd'] = [pr - pet for pr, pet in zip(d['pr'], d['pet'])]
+
+    if units.lower().startswith('e'):
+        for var in ['tmmn', 'tmmx']:
+            d[var] = [c_to_f(v) for v in d[var]]
+
+        for var in ['pr', 'pet', 'pwd']:
+            d[var] = [mm_to_in(v) for v in d[var]]
+
     return d
 
 
 _month_labels = ['January', 'February', 'March', 'April', 'May', 'June',
-                'July', 'August', 'September', 'October', 'November', 'December']
+                 'July', 'August', 'September', 'October', 'November', 'December']
 
 
-def load_gridmet_single_year_monthly(directory, year, agg_func=np.mean):
+def load_gridmet_single_year_monthly(directory, year, units='SI'):
 
     d = {}
     for var in _variables:
@@ -57,6 +84,11 @@ def load_gridmet_single_year_monthly(directory, year, agg_func=np.mean):
 
     _d = {}
     for var in _variables:
+        if var in ['pr', 'pet']:
+            agg_func = np.sum
+        else:
+            agg_func = np.mean
+
         _d[var] = []
         for mo in range(1, 13):
             res = [v for j, v in enumerate(d[var]) if int(_dates[j].month) == int(mo)]
@@ -65,19 +97,21 @@ def load_gridmet_single_year_monthly(directory, year, agg_func=np.mean):
                 res = None
             _d[var].append(res)
 
-    _d['cum_pr'] = []
-    for mo in range(1, 13):
-        res = [v for j, v in enumerate(d['pr']) if _dates[j].month == mo]
-        if len(res) == 0:
-            res = None
+    _d['pwd'] = []
+    for pr, pet in zip(_d['pr'], _d['pet']):
+        if pr is not None and pet is not None:
+            res = pr - pet
         else:
-            res = np.sum(res)
+            res = None
 
-        if res is not None:
-            if math.isnan(res):
-                res = None
+        _d['pwd'].append(res)
 
-        _d['cum_pr'].append(res)
+    if units.lower().startswith('e'):
+        for var in ['tmmn', 'tmmx']:
+            _d[var] = [c_to_f(v) for v in _d[var]]
+
+        for var in ['pr', 'pet', 'pwd']:
+            _d[var] = [mm_to_in(v) for v in _d[var]]
 
     _d['months'] = _month_labels
     _d['year'] = year
@@ -85,7 +119,7 @@ def load_gridmet_single_year_monthly(directory, year, agg_func=np.mean):
     return _d
 
 
-def load_gridmet_all_years(directory, start_year=None, end_year=None):
+def load_gridmet_all_years(directory, start_year=None, end_year=None, units='SI'):
     if start_year is None:
         start_year = 1979
     if end_year is None:
@@ -96,12 +130,12 @@ def load_gridmet_all_years(directory, start_year=None, end_year=None):
 
     d = {}
     for year in range(start_year, end_year + 1):
-        d[year] = load_gridmet_single_year(directory, year)
+        d[year] = load_gridmet_single_year(directory, year, units)
 
     return d
 
 
-def load_gridmet_annual_progression(directory, start_year=None, end_year=None):
+def load_gridmet_annual_progression(directory, start_year=None, end_year=None, units='SI'):
     if start_year is None:
         start_year = 1979
     if end_year is None:
@@ -110,22 +144,28 @@ def load_gridmet_annual_progression(directory, start_year=None, end_year=None):
     start_year = int(start_year)
     end_year = int(end_year)
 
-    d = {var: [] for var in _variables}
+    d = {var: [] for var in list(_variables) + ['pwd']}
     for year in range(start_year, end_year + 1):
-        _d = load_gridmet_single_year(directory, year)
+        _d = load_gridmet_single_year(directory, year, units)
         for var in _variables:
             ts = _d[var]
             if ts is not None:
                 if len(ts) >= 365:
                     d[var].append(ts[:365])
 
-    for var in _variables:
+    for var in list(_variables) + ['pwd']:
         m = np.array(d[var])
         if len(m.shape) == 2:
             d[var + '_mean'] = [float(x) for x in np.mean(m, axis=0)]
             d[var + '_std'] = [float(x) for x in np.std(m, axis=0)]
-            d[var + '_ci90'] = [1.645 * (mu / sigma)
-                                for mu, sigma in zip(d[var + '_mean'], d[var + '_std'])]
+
+            d[var + '_ci90'] = []
+            for mu, sigma in zip(d[var + '_mean'], d[var + '_std']):
+                if sigma > 0.0:
+                    d[var + '_ci90'].append(1.645 * (mu / sigma))
+                else:
+                    d[var + '_ci90'].append(None)
+
         else:
             d[var + '_mean'] = None
             d[var + '_std'] = None
@@ -136,8 +176,7 @@ def load_gridmet_annual_progression(directory, start_year=None, end_year=None):
     return d
 
 
-def load_gridmet_annual_progression_monthly(directory, start_year=None, end_year=None,
-                                            agg_func=np.mean):
+def load_gridmet_annual_progression_monthly(directory, start_year=None, end_year=None, units='SI'):
     if start_year is None:
         start_year = 1979
     if end_year is None:
@@ -146,10 +185,10 @@ def load_gridmet_annual_progression_monthly(directory, start_year=None, end_year
     start_year = int(start_year)
     end_year = int(end_year)
 
-    d = {var: [] for var in _variables}
+    d = {var: [] for var in list(_variables) + ['pwd']}
     for year in range(start_year, end_year + 1):
-        _d = load_gridmet_single_year(directory, year)
-        for var in _variables:
+        _d = load_gridmet_single_year(directory, year, units)
+        for var in list(_variables) + ['pwd']:
             ts = _d[var]
             if ts is not None:
                 if len(ts) >= 365:
@@ -165,30 +204,20 @@ def load_gridmet_annual_progression_monthly(directory, start_year=None, end_year
     _dates = [date(int(start_year), 1, 1) + timedelta(i) for i, _ in enumerate(d['pr'])]
 
     _d = {}
-    for var in _variables:
+    for var in list(_variables) + ['pwd']:
         if var in bad:
             continue
+
         _d[var] = []
         for mo in range(1, 13):
             res = [v for j, v in enumerate(d[var]) if int(_dates[j].month) == int(mo)]
-            res = agg_func(res)
+            res = np.mean(res)
+            if var in ['pr', 'pet', 'pwd']:
+                res *= _days_in_mo[mo-1]
+
             if math.isnan(res):
                 res = None
             _d[var].append(res)
-
-    _d['cum_pr'] = []
-    for mo in range(1, 13):
-        res = [v for j, v in enumerate(d['pr']) if _dates[j].month == mo]
-        if len(res) == 0:
-            res = None
-        else:
-            res = np.sum(res)
-
-        if res is not None:
-            if math.isnan(res):
-                res = None
-
-        _d['cum_pr'].append(res)
 
     _d['months'] = _month_labels
     _d['year'] = year
