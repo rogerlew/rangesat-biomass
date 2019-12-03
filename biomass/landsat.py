@@ -440,6 +440,70 @@ class LandSatScene(object):
             return self._band_proc('sr_band4')
 
     @property
+    def sr(self):
+        return self.nir / self.red
+
+    @property
+    def rdvi(self):
+        nir = self.nir
+        red = self.red
+        return (nir - red) / np.sqrt(nir + red)
+
+    @property
+    def mtvii(self):
+        nir = self.nir
+        red = self.red
+        green = self.green
+        return 1.2 * (1.2 * (nir - green) - 2.5 * (red - green))
+
+    @property
+    def psri(self):
+        return (self.red - self.green) / self.nir
+
+    @property
+    def ci(self):
+        return self.swir1 - self.green
+
+    @property
+    def nci(self):
+        swir1 = self.swir1
+        green = self.green
+        return (swir1 - green) / (swir1 + green)
+
+    @property
+    def rci(self):
+        return self.swir1 / self.red
+
+    @property
+    def ndci(self):
+        swir1 = self.swir1
+        red = self.red
+        return (swir1 - red) / (swir1 + red)
+
+    @property
+    def satvi(self):
+        swir1 = self.swir1
+        swir2 = self.swir2
+        red = self.red
+        return ((swir1 - red) / ((swir1 + red) + 0.5)) * (1 + 0.5) - (swir2 / 2)
+
+    @property
+    def sf(self):
+        return self.swir2 / self.nir
+
+    @property
+    def ndii7(self):
+        swir2 = self.swir2
+        nir = self.nir
+        return (nir - swir2) / (nir + swir2)
+
+    @property
+    def ndwi(self):
+        swir1 = self.swir1
+        nir = self.nir
+        return (nir - swir1) / (nir + swir1)
+
+    @property
     def swir1(self):
         if self.satellite == 8:
             return self._band_proc('sr_band6')
@@ -452,6 +516,14 @@ class LandSatScene(object):
             return self._band_proc('sr_band7')
         elif self.satellite == 7:
             return self._band_proc('sr_band7')
+
+    @property
+    def sti(self):
+        return self.swir1 / self.swir2
+
+    @property
+    def swir_ratio(self):
+        return self.swir2 / self.swir1
 
     @property
     def rgb(self, red_gamma=1.03, blue_gamma=0.925):
