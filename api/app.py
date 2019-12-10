@@ -197,8 +197,9 @@ def geojson_pasture(location, ranch, pasture):
 def scenemeta_location(location):
     filter = request.args.get('filter', None)
     rowpath = request.args.get('rowpath', None)
+
     if location.lower() == 'zumwalt' and rowpath is None:
-        rowpath = '042028'
+        rowpath = '042028 043028'
 
     if rowpath == '*':
         rowpath = None

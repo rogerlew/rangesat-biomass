@@ -19,17 +19,26 @@ from all_your_base.locationinfo import RasterDatasetInterpolator
 
 from all_your_base import SCRATCH, RANGESAT_DIRS
 
+
+_metrics = ('ndvi', 'nbr', 'nbr2', 'evi', 'tcg', 'tcb', 'tcw', 'savi',
+            'msavi', 'ndmi', 'sr', 'rdvi', 'mtvii', 'psri', 'ci', 'nci',
+            'ndci', 'satvi', 'sf', 'ndii7', 'ndwi', 'sti',
+            'swir1', 'swir2', 'swir_ratio')
+
+
 if __name__ == "__main__":
 
     #sf_fn = '/Volumes/Space/geodata/rangesat/CIG_MacroplotsSampled_2019/CIG_MacroPlotsSampled_2019.shp'
-    sf_fn = '/space/rangesat/CIG_MacroPlotsSampled_2019/CIG_MacroPlotsSampled_2019.shp'
+    sf_fn = '/space/rangesat/RangeSAT_SageSteppewPlotBiomass/RangeSAT_SageSteppewPlotBiomass.shp'
     sf_fn = os.path.abspath(sf_fn)
     sf = fiona.open(sf_fn, 'r')
 
-    out_fn = '/space/rangesat/CIG_MacroPlotsSampled_2019/compiled.csv'
+    out_fn = '/space/rangesat/RangeSAT_SageSteppewPlotBiomass/compiled.csv'
     fp = open(out_fn, 'w')
-    csv_wtr = csv.DictWriter(fp, ('location', 'site_id', 'lng', 'lat', 'product_id',
-                                  'acquisition_date', 'ndvi', 'nbr', 'nbr2', 'tcg'))
+    fieldnames = ['location', 'site_id', 'lng', 'lat', 'product_id', 'acquisition_date'] \
+                 + list(_metrics)
+
+    csv_wtr = csv.DictWriter(fp, fieldnames)
     header_written = False
 
     sites = {}
@@ -55,8 +64,16 @@ if __name__ == "__main__":
             _ls_fns = [fn for fn in _ls_fns if len(glob(_join(fn, '*ndvi.tif'))) > 0]
             ls_fns.extend(_ls_fns)
 
+        if len(ls_fns) == 0:
+            for rangesat_dir in RANGESAT_DIRS:
+                _ls_fns = glob(_join(rangesat_dir, 'RCR', 'analyzed_rasters', '*'))
+                _ls_fns = [fn for fn in _ls_fns if isdir(fn)]
+                _ls_fns = [fn for fn in _ls_fns if len(glob(_join(fn, '*ndvi.tif'))) > 0]
+                ls_fns.extend(_ls_fns)
+
         for fn in ls_fns:
-            print(fn)
+            print('    ', fn)
+
             rdi = RasterDatasetInterpolator(glob(_join(fn, '*ndvi.tif'))[0])
             ls = LandSatScene(fn)
 
@@ -64,21 +81,15 @@ if __name__ == "__main__":
                 site_id = site['site_id']
                 lng = site['lng']
                 lat = site['lat']
+                d = {'location': location, 'site_id': site_id,
+                     'lng': lat, 'lat': lat, 'product_id': ls.product_id,
+                     'acquisition_date': ls.acquisition_date}
 
                 py, px = rdi.get_px_coord_from_geo(lng, lat)
 
-                _ndvi = ls.ndvi[px, py]
-                _nbr = ls.nbr[px, py]
-                _nbr2 = ls.nbr2[px, py]
-                _tcg = ls.tasseled_cap_greenness[px, py]
-
-                d = {'location': location, 'site_id': site_id,
-                     'lng': lat, 'lat': lat, 'product_id': ls.product_id,
-                     'acquisition_date': ls.acquisition_date,
-                     'ndvi': _ndvi,
-                     'nbr': _nbr,
-                     'nbr2': _nbr2,
-                     'tcg': _tcg}
+                for indexname in _metrics:
+                    _metric = ls.get_index(indexname)[px, py]
+                    d[indexname] = _metric
 
                 if not header_written:
                     csv_wtr.writeheader()

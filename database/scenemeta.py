@@ -16,7 +16,7 @@ from .location import Location
 
 
 def _scene_wrs_filter(fns, rowpath):
-    return [fn for fn in fns if rowpath == fn.split('_')[2]]
+    return [fn for fn in fns if fn.split('_')[2] in rowpath]
 
 
 def _scene_coverage_filter(location, fns, pasture_coverage_threshold=0.5):
