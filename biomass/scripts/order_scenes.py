@@ -8,7 +8,8 @@ from os.path import join as _join
 from os.path import exists
 
 
-from api.app import RANGESAT_DIR, Location
+from api.app import Location
+from all_your_base import RANGESAT_DIRS
 from climate.gridmet import retrieve_timeseries, GridMetVariable
 
 
@@ -187,21 +188,26 @@ if len(catalog) <= 0:
 
 current_year = datetime.now().year
 
-locations = ['RCR']
+locations = ['JISA', 'PAVA']
 
 for location in locations:
-    loc_path = _join(RANGESAT_DIR, location)
-    assert exists(loc_path)
+    _location = None
+    for rangesat_dir in RANGESAT_DIRS:
+        loc_path = _join(rangesat_dir, location)
+        if exists(loc_path):
+            _location = Location(loc_path)
+            break
 
-    _location = Location(loc_path)
+    assert _location is not None, location
+
     area_ha, bbox = _location.shape_inspection()
 
     e, n, w, s = bbox
     bbox = (e, s, w, n)
 
-    y0 = 1980
-    yend = 2000
-    for landsat_num in [5]:
+    y0 = 2019
+    yend = 2019
+    for landsat_num in [8, 7]:
         for yr in range(y0, yend+1):
             place_order(bbox=bbox,
                         t0=datetime(yr, 1, 1),

@@ -223,24 +223,54 @@ class LandSatScene(object):
     def get_index(self, indexname):
         if indexname.lower() == 'ndvi':
             return self.ndvi
-        if indexname.lower() == 'nbr':
+        elif indexname.lower() == 'nbr':
             return self.nbr
-        if indexname.lower() in ['nbr2', 'ndti']:
+        elif indexname.lower() in ['nbr2', 'ndti']:
             return self.nbr2
-        if indexname.lower() == 'evi':
+        elif indexname.lower() == 'evi':
             return self.evi
-        if indexname.lower() == 'tcg':
+        elif indexname.lower() == 'tcg':
             return self.tasseled_cap_greenness
-        if indexname.lower() == 'tcb':
+        elif indexname.lower() == 'tcb':
             return self.tasseled_cap_brightness
-        if indexname.lower() == 'tcw':
+        elif indexname.lower() == 'tcw':
             return self.tasseled_cap_wetness
-        if indexname.lower() == 'savi':
+        elif indexname.lower() == 'savi':
             return self.savi
-        if indexname.lower() == 'msavi':
+        elif indexname.lower() == 'msavi':
             return self.msavi
-        if indexname.lower() == 'ndmi':
+        elif indexname.lower() == 'ndmi':
             return self.ndmi
+        elif indexname.lower() == 'sr':
+            return self.sr
+        elif indexname.lower() == 'rdvi':
+            return self.rdvi
+        elif indexname.lower() == 'mtvii':
+            return self.mtvii
+        elif indexname.lower() == 'psri':
+            return self.psri
+        elif indexname.lower() == 'ci':
+            return self.ci
+        elif indexname.lower() == 'nci':
+            return self.nci
+        elif indexname.lower() == 'ndci':
+            return self.ndci
+        elif indexname.lower() == 'satvi':
+            return self.satvi
+        elif indexname.lower() == 'sf':
+            return self.sf
+        elif indexname.lower() == 'ndii7':
+            return self.ndii7
+        elif indexname.lower() == 'ndwi':
+            return self.ndwi
+        elif indexname.lower() == 'sti':
+            return self.sti
+        elif indexname.lower() == 'swir1':
+            return self.swir1
+        elif indexname.lower() == 'swir2':
+            return self.swir2
+        elif indexname.lower() == 'swir_ratio':
+            return self.swir_ratio
 
         raise KeyError(indexname)
 
@@ -576,8 +606,10 @@ class LandSatScene(object):
 
     def _veg_proc(self, measure):
         res = self._d[measure].read(1, masked=True)
-        res = np.array(res, dtype=np.float64)
+        res = np.ma.masked_values(res, -9999.0)
+        res = np.ma.array(res, dtype=np.float64)
         res *= 0.0001
+        res = np.clip(res, -1.0, 1.0)
         return res
 
     @property
