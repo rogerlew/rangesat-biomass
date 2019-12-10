@@ -4,3 +4,5 @@ venv
 *.pyc
 *.nc
 temp
+scripts/biomass_rasters/
+scripts/*.tif
