@@ -116,7 +116,7 @@ def query_pasture_stats(db_fn, ranch=None, acquisition_date=None, pasture=None):
     if pasture is not None:
         if i > 0:
             query += ' AND'
-        query += ' pasture = "{pasture}"'.format(pasture=pasture.replace('_', ' '))
+        query += ' pasture = "{pasture}"'.format(pasture=pasture.replace('_', ' ').replace('Derrick Old', 'Derrick_Old'))
         i += 1
 
     if acquisition_date is not None:
@@ -158,7 +158,7 @@ def query_singleyear_pasture_stats(db_fn, ranch=None, pasture=None, year=None,
     if pasture is not None:
         if i > 0:
             query += ' AND'
-        query += ' pasture = "{pasture}"'.format(pasture=pasture.replace('_', ' '))
+        query += ' pasture = "{pasture}"'.format(pasture=pasture.replace('_', ' ').replace('Derrick Old', 'Derrick_Old'))
         i += 1
 
     if year is not None:
@@ -308,7 +308,8 @@ def query_seasonalprogression_pasture_stats(db_fn, ranch=None, pasture=None,
     if pasture is not None:
         if i > 0:
             query += ' AND'
-        query += ' pasture = "{pasture}"'.format(pasture=pasture.replace('_', ' '))
+        query += ' pasture = "{pasture}"'.format(pasture=pasture.replace('_', ' ')
+                                                                .replace('Derrick Old', 'Derrick_Old'))
         i += 1
 
     c.execute(query)
@@ -375,7 +376,7 @@ def query_interyear_pasture_stats(db_fn, ranch=None, pasture=None, start_year=No
     if pasture is not None:
         if i > 0:
             query += ' AND'
-        query += ' pasture = "{pasture}"'.format(pasture=pasture.replace('_', ' '))
+        query += ' pasture = "{pasture}"'.format(pasture=pasture.replace('_', ' ').replace('Derrick Old', 'Derrick_Old'))
         i += 1
 
     c.execute(query)
@@ -445,7 +446,7 @@ def query_multiyear_pasture_stats(db_fn, ranch=None, pasture=None, start_year=No
     if pasture is not None:
         if i > 0:
             query += ' AND'
-        query += ' pasture = "{pasture}"'.format(pasture=pasture.replace('_', ' '))
+        query += ' pasture = "{pasture}"'.format(pasture=pasture.replace('_', ' ').replace('Derrick Old', 'Derrick_Old'))
         i += 1
 
     c.execute(query)
