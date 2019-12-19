@@ -17,9 +17,7 @@ def make_raster_difference(scn_fn1, scn_fn2, dst_fn, nodata=-9999.0):
     _data2 = ds2.read()
     assert _data1.shape == _data2.shape
 
-    print(_data2.shape)
-
-    data = np.subtract(_data2[0,:,:], _data1[0,:,:])
+    data = (_data2[0, :, :] - _data1[0, :, :]) / _data1[0, :, :]
 
     if isinstance(data, np.ma.core.MaskedArray):
         data.fill_value = nodata
