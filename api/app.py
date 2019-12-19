@@ -632,7 +632,7 @@ def raster_difference(location, product):
                     fn = glob(_join(out_dir, product_id, 'biomass/*{}.tif'.format(product)))
 
             if len(fn) != 1:
-                return jsonify(None)
+                return jsonify('fn is none', product)
             fn = fn[0]
 
             if ranches is not None:
@@ -658,7 +658,7 @@ def raster_difference(location, product):
                     fn2 = glob(_join(out_dir, product_id2, 'biomass/*{}.tif'.format(product)))
 
             if len(fn2) != 1:
-                return jsonify(None)
+                return jsonify('fn2 is none', fn2, product, product_id2)
             fn2 = fn2[0]
 
             if ranches is not None:
