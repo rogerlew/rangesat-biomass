@@ -271,6 +271,8 @@ class LandSatScene(object):
             return self.swir2
         elif indexname.lower() == 'swir_ratio':
             return self.swir_ratio
+        elif indexname.lower() == 'aerosol':
+            return self.aerosol
 
         raise KeyError(indexname)
 
