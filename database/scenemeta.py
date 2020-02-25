@@ -19,19 +19,23 @@ def _scene_wrs_filter(fns, rowpath):
     return [fn for fn in fns if fn.split('_')[2] in rowpath]
 
 
-def _scene_coverage_filter(location, fns, pasture_coverage_threshold=0.5):
+def _scene_coverage_filter(location, fns, pasture_coverage_threshold=0.5, ls8_only=False):
     for rangesat_dir in RANGESAT_DIRS:
         loc_path = _join(rangesat_dir, location)
         if exists(loc_path):
             _location = Location(loc_path)
             scn_cov_db_fn = _location.scn_cov_db_fn
-            
+
+    if ls8_only:
+        fns = [fn for fn in fns if fn[3] == '8']
+
     mask = query_scenes_coverage(scn_cov_db_fn, fns)
     mask = [coverage < pasture_coverage_threshold for coverage in mask]
+
     return [fn for m, fn in zip(mask, fns) if not m]
 
 
-def scenemeta_location_all(location, rowpath=None, pasture_coverage_threshold=0.5):
+def scenemeta_location_all(location, rowpath=None, pasture_coverage_threshold=0.5, ls8_only=False):
 
     for rangesat_dir in RANGESAT_DIRS:
         loc_path = _join(rangesat_dir, location)
@@ -46,7 +50,7 @@ def scenemeta_location_all(location, rowpath=None, pasture_coverage_threshold=0.
                 ls_fns = _scene_wrs_filter(ls_fns, rowpath)
 
             if pasture_coverage_threshold is not None:
-                ls_fns = _scene_coverage_filter(location, ls_fns, pasture_coverage_threshold)
+                ls_fns = _scene_coverage_filter(location, ls_fns, pasture_coverage_threshold, ls8_only)
 
             return _scene_sorter(ls_fns)
 
@@ -80,7 +84,7 @@ def scenemeta_location_closest_date(location, target_date, rowpath=None, pasture
             return ls_fns[np.argmin([abs((_target - _date).days) for _date in dates])]
 
 
-def scenemeta_location_latest(location, rowpath=None, pasture_coverage_threshold=0.5):
+def scenemeta_location_latest(location, rowpath=None, pasture_coverage_threshold=0.5, ls8_only=False):
     for rangesat_dir in RANGESAT_DIRS:
         loc_path = _join(rangesat_dir, location)
         if exists(loc_path):
@@ -94,7 +98,7 @@ def scenemeta_location_latest(location, rowpath=None, pasture_coverage_threshold
                 ls_fns = _scene_wrs_filter(ls_fns, rowpath)
 
             if pasture_coverage_threshold is not None:
-                ls_fns = _scene_coverage_filter(location, ls_fns, pasture_coverage_threshold)
+                ls_fns = _scene_coverage_filter(location, ls_fns, pasture_coverage_threshold, ls8_only)
 
             dates = [int(fn.split('_')[3]) for fn in ls_fns]
             return ls_fns[np.argmax(dates)]
@@ -105,7 +109,7 @@ def _scene_sorter(fns):
 
 
 def scenemeta_location_intrayear(location, year, start_date, end_date, rowpath=None,
-                                 pasture_coverage_threshold=0.5):
+                                 pasture_coverage_threshold=0.5, ls8_only=False):
     for rangesat_dir in RANGESAT_DIRS:
         loc_path = _join(rangesat_dir, location)
         if exists(loc_path):
@@ -126,12 +130,12 @@ def scenemeta_location_intrayear(location, year, start_date, end_date, rowpath=N
                 ls_fns = _scene_wrs_filter(ls_fns, rowpath)
 
             if pasture_coverage_threshold is not None:
-                ls_fns = _scene_coverage_filter(location, ls_fns, pasture_coverage_threshold)
+                ls_fns = _scene_coverage_filter(location, ls_fns, pasture_coverage_threshold, ls8_only)
             return _scene_sorter(ls_fns)
 
 
 def scenemeta_location_interyear(location, start_year, end_year, start_date, end_date, rowpath=None,
-                                 pasture_coverage_threshold=0.5):
+                                 pasture_coverage_threshold=0.5, ls8_only=False):
     for rangesat_dir in RANGESAT_DIRS:
         loc_path = _join(rangesat_dir, location)
         if exists(loc_path):
@@ -161,5 +165,5 @@ def scenemeta_location_interyear(location, start_year, end_year, start_date, end
                 ls_fns = _scene_wrs_filter(ls_fns, rowpath)
 
             if pasture_coverage_threshold is not None:
-                ls_fns = _scene_coverage_filter(location, ls_fns, pasture_coverage_threshold)
+                ls_fns = _scene_coverage_filter(location, ls_fns, pasture_coverage_threshold, ls8_only)
             return _scene_sorter(ls_fns)
