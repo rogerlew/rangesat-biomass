@@ -91,6 +91,10 @@ def load_gridmet_single_year_monthly(directory, year, units='SI'):
 
         _d[var] = []
         for mo in range(1, 13):
+            if d[var] is None:
+                _d[var].append(None)
+                continue
+
             res = [v for j, v in enumerate(d[var]) if int(_dates[j].month) == int(mo)]
             res = agg_func(res)
             if math.isnan(res):
