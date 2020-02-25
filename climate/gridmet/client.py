@@ -182,7 +182,7 @@ if __name__ == "__main__":
             geo_locations[(pasture, ranch)] = _pasture['centroid']
 
     start_year = 1979
-    end_year = 2019
+    end_year = 2020
 
     met_dir = _join(_location.loc_path, 'gridmet')
     #print(met_dir)
