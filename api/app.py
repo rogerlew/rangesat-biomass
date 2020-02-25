@@ -59,6 +59,7 @@ app = Flask(__name__)
 _thisdir = os.path.dirname(__file__)
 STATIC_DIR = _join(_thisdir, 'static')
 
+
 @app.route('/')
 def index():
     return jsonify(
@@ -197,6 +198,7 @@ def geojson_pasture(location, ranch, pasture):
 def scenemeta_location(location):
     filter = request.args.get('filter', None)
     rowpath = request.args.get('rowpath', None)
+    ls8_only = bool(request.args.get('ls8_only', False))
 
     if location.lower() == 'zumwalt' and rowpath is None:
         rowpath = '042028 043028'
@@ -210,12 +212,14 @@ def scenemeta_location(location):
 
     if filter == 'latest':
         return jsonify(scenemeta_location_latest(location, rowpath=rowpath,
-                                                 pasture_coverage_threshold=pasture_coverage_threshold))
+                                                 pasture_coverage_threshold=pasture_coverage_threshold,
+                                                 ls8_only=ls8_only))
     elif filter == 'closest-date':
         target_date = request.args.get('target_date', None)
         return jsonify(scenemeta_location_closest_date(location, target_date=target_date,
                                                        rowpath=rowpath,
-                                                       pasture_coverage_threshold=pasture_coverage_threshold))
+                                                       pasture_coverage_threshold=pasture_coverage_threshold,
+                                                       ls8_only=ls8_only))
     elif filter == 'inter-year':
         start_year =request.args.get('start_year', None)
         end_year = request.args.get('end_year', None)
@@ -223,19 +227,22 @@ def scenemeta_location(location):
         end_date = request.args.get('end_date', '12-31')
         return jsonify(scenemeta_location_interyear(location, start_year, end_year, start_date, end_date,
                                                     rowpath=rowpath,
-                                                    pasture_coverage_threshold=pasture_coverage_threshold))
+                                                    pasture_coverage_threshold=pasture_coverage_threshold,
+                                                    ls8_only=ls8_only))
     elif filter == 'intra-year':
         year =request.args.get('year', None)
         start_date = request.args.get('start_date', '1-1')
         end_date = request.args.get('end_date', '12-31')
         return jsonify(scenemeta_location_intrayear(location, year, start_date, end_date,
                                                     rowpath=rowpath,
-                                                    pasture_coverage_threshold=pasture_coverage_threshold))
+                                                    pasture_coverage_threshold=pasture_coverage_threshold,
+                                                    ls8_only=ls8_only))
 
     else:
         return jsonify(scenemeta_location_all(location,
-                                          rowpath=rowpath,
-                                          pasture_coverage_threshold=pasture_coverage_threshold))
+                                              rowpath=rowpath,
+                                              pasture_coverage_threshold=pasture_coverage_threshold,
+                                              ls8_only=ls8_only))
 
 
 @app.route('/scenemeta/<location>/<product_id>')
@@ -633,6 +640,7 @@ def raster_difference(location, product):
 
             if len(fn) != 1:
                 return jsonify('fn is none', product)
+
             fn = fn[0]
 
             if ranches is not None:
