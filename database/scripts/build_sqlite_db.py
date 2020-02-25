@@ -10,6 +10,7 @@ import sys
 
 sys.path.insert(0, '/var/www/rangesat-biomass')
 from api.app import RANGESAT_DIRS, Location
+from all_your_base import isfloat
 
 locations = ['Zumwalt']
 
@@ -26,7 +27,7 @@ for location in locations:
     out_dir = _location.out_dir
     key_delimiter = "+"#_location.
 
-    db_fn = _join(out_dir, 'sqlite3.db')
+    db_fn = _join(out_dir, '_sqlite3.db')
 
     if exists(db_fn):
         os.remove(db_fn)
@@ -204,6 +205,22 @@ for location in locations:
 
                 if nbr2_ci90.replace('-', '') == '':
                     nbr2_ci90 = 'null'
+
+                if isfloat(nbr_mean):
+                    if float(nbr_mean) == -1.0:
+                        coverage = '0'
+                        valid_px = '0'
+                        biomass_mean_gpm = 'null'
+                        biomass_ci90_gpm = 'null'
+                        biomass_10pct_gpm = 'null'
+                        biomass_75pct_gpm = 'null'
+                        biomass_90pct_gpm = 'null'
+                        biomass_total_kg = 'null'
+                        biomass_sd_gpm = 'null'
+                        summer_vi_mean_gpm = 'null'
+                        fall_vi_mean_gpm = 'null'
+                        fraction_summer = 'null'
+
                 pasture, ranch = key.split(key_delimiter)
                 _date = product_id.split('_')[3]
                 acquisition_date = date(int(_date[:4]), int(_date[4:6]), int(_date[6:]))
@@ -238,6 +255,15 @@ for location in locations:
                 except:
                     print(query, coverage, area_ha, valid_px)
                     raise
+
+    # Save (commit) the changes
+    conn.commit()
+
+    if location == "Zumwalt":
+        c.execute("""DELETE FROM pasture_stats FROM pasture_stats == "6 Ranch All";""")
+        c.execute("""UPDATE pastures_stats SET key = "P 3A+Probert", ranch = "Probert" WHERE pasture == "P 3A";""")
+        c.execute("""UPDATE pastures_stats SET key = "P 2+Probert", ranch = "Probert" WHERE pasture == "P 2";""")
+
     # Save (commit) the changes
     conn.commit()
 

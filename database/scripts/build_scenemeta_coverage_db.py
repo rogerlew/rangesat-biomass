@@ -8,6 +8,7 @@ from os.path import exists
 import shutil
 import sys
 
+sys.path.insert(0, '/var/www/rangesat-biomass')
 from database.pasturestats import query_scene_product_ids
 
 
@@ -45,8 +46,8 @@ def query_scenes_coverage(scn_cov_db_fn, product_ids):
 
 
 if __name__ == "__main__":
-    db_fn = '/Users/roger/Downloads/sqlite3.db'
-    cov_db_fn = '/Users/roger/Downloads/scenemeta_coverage.db'
+    db_fn = '/space/rangesat/Zumwalt/sqlite3.db'
+    cov_db_fn = '/space/rangesat/Zumwalt/scenemeta_coverage.db'
 
     product_ids = query_scene_product_ids(db_fn)
 
