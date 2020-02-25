@@ -75,3 +75,10 @@ def bounds_intersect(a, b):
     return x1 < x2 and y1 < y2
 
 
+def isfloat(f):
+    # noinspection PyBroadException
+    try:
+        float(f)
+        return True
+    except Exception:
+        return False
