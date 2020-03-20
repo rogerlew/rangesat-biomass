@@ -22,13 +22,13 @@ if __name__ == "__main__":
             os.remove(dst2)
 
         cmd = ['gdalwarp', '-t_srs', 'EPSG:4326', '-of', 'vrt', src, dst]
-        print(cmd)
+
         p = Popen(cmd)
         print('%i of %i...' % (i, len(fns)), end='')
         p.wait()
 
         cmd = ['gdal_translate', '-co', 'COMPRESS=LZW', '-of', 'GTiff', dst, dst2]
-        print(cmd)
+
         p = Popen(cmd)
         print('%i of %i...' % (i, len(fns)), end='')
         p.wait()
