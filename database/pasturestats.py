@@ -197,7 +197,13 @@ def query_intrayear_pasture_stats(db_fn, ranch=None, pasture=None, year=None,
     agg = []
     for key in d:
         agg.append(_aggregate(d[key], agg_func))
-        _pasture, _ranch = key.split(key_delimiter)
+        try:
+            _pasture, _ranch = key.split(key_delimiter)
+        except:
+            print(key)
+            agg[-1]['pasture'] = key
+            agg[-1]['ranch'] = None
+
         agg[-1]['pasture'] = _pasture
         agg[-1]['ranch'] = _ranch
 

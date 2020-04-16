@@ -2,6 +2,8 @@ import sqlite3
 from glob import glob
 from datetime import date
 import os
+
+from os.path import exists as _exists
 import csv
 from os.path import join as _join
 from os.path import exists
@@ -46,8 +48,14 @@ def query_scenes_coverage(scn_cov_db_fn, product_ids):
 
 
 if __name__ == "__main__":
-    db_fn = '/space/rangesat/Zumwalt/sqlite3.db'
-    cov_db_fn = '/space/rangesat/Zumwalt/scenemeta_coverage.db'
+    #db_fn = '/space/rangesat/Zumwalt/sqlite3.db'
+    db_fn = '/var/www/rangesat-biomass/sites/SageSteppe/rcr_sqlite3.db'
+
+    #cov_db_fn = '/space/rangesat/Zumwalt/scenemeta_coverage.db'
+    cov_db_fn = '/var/www/rangesat-biomass/sites/SageSteppe/rcr_scenemeta_coverage.db'
+
+    if _exists(cov_db_fn):
+        os.remove(cov_db_fn)
 
     product_ids = query_scene_product_ids(db_fn)
 

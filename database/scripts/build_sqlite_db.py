@@ -12,7 +12,8 @@ sys.path.insert(0, '/var/www/rangesat-biomass')
 from api.app import RANGESAT_DIRS, Location
 from all_your_base import isfloat
 
-locations = ['Zumwalt']
+locations = ['SageSteppe']
+db_fn = '/var/www/rangesat-biomass/sites/SageSteppe/rcr_sqlite3.db'
 
 for location in locations:
     _location = None
@@ -27,7 +28,7 @@ for location in locations:
     out_dir = _location.out_dir
     key_delimiter = "+"#_location.
 
-    db_fn = _join(out_dir, '_sqlite3.db')
+    #db_fn = _join(out_dir, '_sqlite3.db')
 
     if exists(db_fn):
         os.remove(db_fn)
@@ -221,7 +222,7 @@ for location in locations:
                         fall_vi_mean_gpm = 'null'
                         fraction_summer = 'null'
 
-                pasture, ranch = key.split(key_delimiter)
+                pasture, ranch = key.replace('-RCR', '+RCR').split(key_delimiter)
                 _date = product_id.split('_')[3]
                 acquisition_date = date(int(_date[:4]), int(_date[4:6]), int(_date[6:]))
 
@@ -249,6 +250,8 @@ for location in locations:
                                  nbr_90pct=nbr_90pct, nbr_ci90=nbr_ci90,
                                  nbr2_mean=nbr2_mean, nbr2_sd=nbr2_sd, nbr2_10pct=nbr2_10pct, nbr2_75pct=nbr2_75pct,
                                  nbr2_90pct=nbr2_90pct, nbr2_ci90=nbr2_ci90)
+
+                query = query.replace('inf', 'null')
 
                 try:
                     c.execute(query)

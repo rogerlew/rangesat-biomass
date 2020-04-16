@@ -110,6 +110,13 @@ class Location(object):
         return d
 
     def extract_pixels(self, raster_fn, ranch=None, pasture=None):
+
+        if ranch is not None:
+            ranch = ranch.replace(' ', '_')
+
+        if pasture is not None:
+            pasture = pasture.replace(' ', '_')
+
         loc_path = self.loc_path
         _d = self._d
 
@@ -136,6 +143,14 @@ class Location(object):
         return [float(x) for x in x[x.mask == False]]
 
     def get_pasture_indx(self, raster_fn, pasture, ranch):
+
+        if ranch is not None:
+            ranch = ranch.replace(' ', '_')
+
+        if pasture is not None:
+            pasture = pasture.replace(' ', '_')
+
+
         target_ranch = ranch.replace(' ', '_').lower().strip()
         target_pasture = pasture.replace(' ', '_').lower().strip()
 
@@ -265,6 +280,10 @@ class Location(object):
             os.remove(dst_vrt_fn)
 
     def shape_inspection(self, ranch=None):
+
+        if ranch is not None:
+            ranch = ranch.replace(' ', '_')
+
         loc_path = self.loc_path
         _d = self._d
 
@@ -302,6 +321,10 @@ class Location(object):
         return float(np.sum(list(area_ha.values()))), bbox
 
     def serialized_ranch(self, ranch):
+
+        if ranch is not None:
+            ranch = ranch.replace(' ', '_')
+
         if ranch not in self.pastures:
             return None
 
@@ -312,6 +335,14 @@ class Location(object):
                     area_ha=area_ha, bbox=bbox)
 
     def pasture_inspection(self, ranch, pasture):
+
+        if ranch is not None:
+            ranch = ranch.replace(' ', '_')
+
+        if pasture is not None:
+            pasture = pasture.replace(' ', '_')
+
+
         loc_path = self.loc_path
         _d = self._d
 
@@ -359,6 +390,12 @@ class Location(object):
         return area_ha, centroid
 
     def serialized_pasture(self, ranch, pasture):
+        if ranch is not None:
+            ranch = ranch.replace(' ', '_')
+
+        if pasture is not None:
+            pasture = pasture.replace(' ', '_')
+
         if ranch not in self.pastures:
             return None
 
@@ -380,10 +417,18 @@ class Location(object):
         if ranch is None and pasture is None:
             return js
 
+        if ranch is not None:
+            ranch = ranch.replace(' ', '_')
+
+        if pasture is not None:
+            pasture = pasture.replace(' ', '_')
+
         _features = []
         for f in js['features']:
             key = f['properties'][sf_feature_properties_key].replace(' ', '_')
             _pasture, _ranch = key.split(self.key_delimiter)
+
+            print(pasture)
 
             if (ranch is None or _ranch.lower() == ranch.lower()) and \
                (pasture is None or _pasture.lower() == pasture.lower()):
