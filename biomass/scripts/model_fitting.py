@@ -33,7 +33,7 @@ if __name__ == "__main__":
     sf_fn = os.path.abspath(sf_fn)
     sf = fiona.open(sf_fn, 'r')
 
-    out_fn = '/space/rangesat/RangeSAT_SageSteppewPlotBiomass/compiled.csv'
+    out_fn = '/var/www/rangesat-biomass/sites/SageSteppe/compiled.csv'
     fp = open(out_fn, 'w')
     fieldnames = ['location', 'site_id', 'lng', 'lat', 'product_id', 'acquisition_date'] \
                  + list(_metrics)

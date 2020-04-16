@@ -1,0 +1,70 @@
+# Rock Creek Ranch Pastures
+
+# Herbaceous model uses the NDTI (SWIR1-SWIR2/SWIR1+SWIR2) for
+# both summer and fall
+
+# Shrub model for now uses very different indices, the enhanced
+# vegetation index (EVI) which might be a product and the
+# tasseled cap greeness index
+
+# multiple models can be defined. e.g. Herbaceous and Shrub
+# [-1.21568512e+02,  1.17219025e+03,  5.22496039e+01,  3.40053271e+02, 9.91636476e-02]
+# [-121.568512,  1172.19025,  52.2496039,  340.053271, 0.0991636476]
+#  fall_int,     fall_slp,    summer_int,  summer_slp, dis_par
+models:
+    - name: Herbaceous
+      satellite_pars:
+          - satellite: 8
+            discriminate_threshold: 0.0991636476
+            discriminate_index: psri
+            summer_int: 52.2496039
+            summer_slp: 340.053271
+            summer_index: nbr
+            fall_int: -121.568512
+            fall_slp: 1172.19025
+            fall_index: nbr2
+            required_coverage: 0.5
+            minimum_area_ha: 1.8
+            log_transformed_estimate: False
+          - satellite: 7
+            discriminate_threshold: 0.0991636476
+            discriminate_index: psri
+            summer_int: 52.2496039
+            summer_slp: 340.053271
+            summer_index: nbr
+            fall_int: -121.568512
+            fall_slp: 1172.19025
+            fall_index: nbr2
+            required_coverage: 0.5
+            minimum_area_ha: 1.8
+            log_transformed_estimate: False
+          - satellite: 5
+            discriminate_threshold: 0.0991636476
+            discriminate_index: psri
+            summer_int: 52.2496039
+            summer_slp: 340.053271
+            summer_index: nbr
+            fall_int: -121.568512
+            fall_slp: 1172.19025
+            fall_index: nbr2
+            required_coverage: 0.5
+            minimum_area_ha: 1.8
+            log_transformed_estimate: False
+
+# shapefile containing pastures to analyze
+sf_fn: /geodata/torch-landsat/rangesat/SageSteppe/vector_data/RockCreekRanch_habitatmodeled.shp
+
+# primary key for pastures in shapefile
+# e.g. key = feature['properties'][sf_feature_properties_key]
+sf_feature_properties_key: PastID_Key
+
+# location to place cropped landsat scenes and biomass rasters
+out_dir: /geodata/torch-landsat/rangesat/SageSteppe/analyzed_rasters
+
+# directory containing extracted landsat scenes
+landsat_scene_directory: /geodata/torch-landsat
+
+wrs_whitelist: []
+
+# path rows that should be skipped
+wrs_blacklist: []

@@ -27,11 +27,13 @@ def _quantile(a, q):
 
 
 class SatModelPars(object):
-    def __init__(self, satellite, ndvi_threshold, summer_int,
+    def __init__(self, satellite, discriminate_threshold, summer_int,
                  summer_slp, fall_int, fall_slp, required_coverage, minimum_area_ha,
-                 summer_index='nbr', fall_index='ndti'):
+                 summer_index='nbr', fall_index='ndti', discriminate_index='ndvi', log_transformed_estimate=False):
+
         self.satellite = satellite
-        self.ndvi_threshold = ndvi_threshold
+        self.discriminate_threshold = discriminate_threshold
+        self.discriminate_index = discriminate_index
         self.summer_int = summer_int
         self.summer_slp = summer_slp
         self.summer_index = summer_index
@@ -40,7 +42,7 @@ class SatModelPars(object):
         self.fall_index = fall_index
         self.required_coverage = required_coverage
         self.minimum_area_ha = minimum_area_ha
-
+        self.log_transformed_estimate = log_transformed_estimate
 
 class ModelPars(object):
     def __init__(self, name, sat_pars):
@@ -83,7 +85,7 @@ class ModelStat(object):
 
 
 class BiomassModel(object):
-    def __init__(self, ls: LandSatScene, models: ModelPars):
+    def __init__(self, ls: LandSatScene, models: ModelPars, verbose=False):
 
         sat = ls.satellite
 
@@ -102,32 +104,46 @@ class BiomassModel(object):
         qa_mask = qa_mask > 0
         not_qa_mask = np.logical_not(qa_mask)
 
-        #
-        # Build the biomass model
-        #
-        _ndvi = np.ma.array(ls.ndvi, mask=qa_mask)
+        if verbose:
+            print('not_qa_mask', np.sum(not_qa_mask))
 
-        # `models` contains a list of Models. e.g. Shrub and Herbaceous.
-        # Each Model has parameters for multiple satellites.
-        # Here we construct grids for each of the Model in the models list.
-
-        # summer vegetation is based on NBR. It is applied when NDVI is greater than the ndvi_threshold
-        # specified in the Model parameters.
-        summer_mask = {m.name: ls.threshold_ndvi(m[sat].ndvi_threshold, mask=qa_mask) for m in models}
+        #
+        # Build the biomass models
+        #
+        summer_mask = {}
         summer_vi = {}
-        for m in models:
-            summer_index = np.ma.array(ls.get_index(m[sat].summer_index), mask=qa_mask)
-            summer_vi[m.name] = summer_mask[m.name] * np.clip(m[sat].summer_int + m[sat].summer_slp * summer_index, a_min=0, a_max=None)
-
-        # fall is based on NBR2. It is applied when NDVI is less than or equal to the ndvi_threshold
-        fall_mask = {m.name: np.logical_not(summer_mask[m.name]) for m in models}
+        fall_mask = {}
         fall_vi = {}
-        for m in models:
-            fall_index = np.ma.array(ls.get_index(m[sat].fall_index), mask=qa_mask)
-            fall_vi[m.name] = fall_mask[m.name] * np.clip(m[sat].fall_int + m[sat].fall_slp * fall_index, a_min=0, a_max=None)
+        biomass = {}
 
-        # biomass is the sum of fall and summer
-        biomass = {m.name: summer_vi[m.name] + fall_vi[m.name] for m in models}
+        for m in models:
+            summer_mask[m.name] = ls.threshold(m[sat].discriminate_index, m[sat].discriminate_threshold, qa_mask)
+
+            summer_index = np.ma.array(ls.get_index(m[sat].summer_index), mask=qa_mask)
+            summer_vi[m.name] = summer_mask[m.name] * np.clip(m[sat].summer_int + m[sat].summer_slp * summer_index,
+                                                              a_min=0, a_max=None)
+
+            if m[sat].log_transformed_estimate:
+                summer_vi[m.name] = np.exp(summer_vi[m.name])
+
+            # fall is based on NBR2. It is applied when PSRI is less than or equal to the psri_threshold
+            fall_mask[m.name] = np.logical_not(summer_mask[m.name])
+            fall_index = np.ma.array(ls.get_index(m[sat].fall_index), mask=qa_mask)
+            fall_vi[m.name] = fall_mask[m.name] * np.clip(m[sat].fall_int + m[sat].fall_slp * fall_index,
+                                                          a_min=0, a_max=None)
+
+            if m[sat].log_transformed_estimate:
+                fall_vi[m.name] = np.exp(fall_vi[m.name])
+
+            # biomass is the sum of fall and summer
+            biomass[m.name] = summer_vi[m.name] + fall_vi[m.name]
+
+            if verbose:
+                print('summer_index', np.mean(summer_index))
+                print('summer_vi[m.name]', np.mean(summer_vi[m.name]))
+                print('summer_index', np.mean(summer_index))
+                print('fall_index', np.mean(fall_index))
+                print('biomass[m.name]', np.mean(biomass[m.name]))
 
         self.ls = ls
         self.aerosol_mask = aerosol_mask
@@ -143,11 +159,9 @@ class BiomassModel(object):
         self.biomass = biomass
         self.models = models
 
-        self.ndvi = _ndvi
+        self.ndvi = np.ma.array(ls.ndvi, mask=qa_mask)
         self.nbr = np.ma.array(ls.nbr, mask=qa_mask)
         self.nbr2 = np.ma.array(ls.nbr2, mask=qa_mask)
-#        self.evi = np.ma.array(ls.evi, mask=qa_mask)
-#        self.tcg = np.ma.array(ls.tasseled_cap_greenness, mask=qa_mask)
 
     def export_grids(self, biomass_dir, dtype=rasterio.float32):
         """

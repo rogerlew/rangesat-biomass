@@ -21,6 +21,8 @@ RANGESAT_DIRS = []
 for geo_dir in GEODATA_DIRS:
     if exists(_join(geo_dir, 'rangesat')):
         RANGESAT_DIRS.append(_join(geo_dir, 'rangesat'))
+if exists('/geodata/torch-landsat/rangesat'):
+    RANGESAT_DIRS.append('/geodata/torch-landsat/rangesat')
 assert len(RANGESAT_DIRS) > 0
 
 

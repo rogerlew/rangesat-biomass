@@ -322,7 +322,6 @@ class LandSatScene(object):
     def aerosol(self):
         if self.satellite == 8:
             return self._d['sr_aerosol'].read(1, masked=True)
-
         else:
             return self._d['sr_atmos_opacity'].read(1, masked=True)
 
@@ -447,29 +446,39 @@ class LandSatScene(object):
     def blue(self):
         if self.satellite == 8:
             return self._band_proc('sr_band2')
+        elif self.satellite == 7:
+            return 0.0003 + 0.8474 * self._band_proc('sr_band1')
         else:
-            return self._band_proc('sr_band1')
+            return -0.0095 + 0.9785 * self._band_proc('sr_band1')
 
     @property
     def green(self):
         if self.satellite == 8:
             return self._band_proc('sr_band3')
+        elif self.satellite == 7:
+            return 0.0088 + 0.8483 * self._band_proc('sr_band2')
         else:
-            return self._band_proc('sr_band2')
+            return -0.0016 + 0.9542 * self._band_proc('sr_band2')
+
 
     @property
     def red(self):
         if self.satellite == 8:
             return self._band_proc('sr_band4')
+        elif self.satellite == 7:
+            return 0.0061 + 0.9047 * self._band_proc('sr_band3')
         else:
-            return self._band_proc('sr_band3')
+            return -0.0022 + 0.9825 * self._band_proc('sr_band3')
+
 
     @property
     def nir(self):
         if self.satellite == 8:
             return self._band_proc('sr_band5')
         elif self.satellite == 7:
-            return self._band_proc('sr_band4')
+            return 0.0412 + 0.8462 * self._band_proc('sr_band4')
+        else:
+            return -0.0021 + 1.0073 * self._band_proc('sr_band4')
 
     @property
     def sr(self):
@@ -540,14 +549,18 @@ class LandSatScene(object):
         if self.satellite == 8:
             return self._band_proc('sr_band6')
         elif self.satellite == 7:
-            return self._band_proc('sr_band5')
+            return 0.0254 + 0.8937 * self._band_proc('sr_band5')
+        else:
+            return -0.0030 + 1.0171 * self._band_proc('sr_band5')
 
     @property
     def swir2(self):
         if self.satellite == 8:
             return self._band_proc('sr_band7')
         elif self.satellite == 7:
-            return self._band_proc('sr_band7')
+            return 0.0172 + 0.9071 * self._band_proc('sr_band7')
+        else:
+            return 0.0029 + 0.9949 * self._band_proc('sr_band7')
 
     @property
     def sti(self):
@@ -616,48 +629,115 @@ class LandSatScene(object):
 
     @property
     def ndvi(self):
-        return self._veg_proc('sr_ndvi')
+        """https://www.usgs.gov/land-resources/nli/landsat/landsat-normalized-difference-vegetation-index?qt-science_support_page_related_con=0#qt-science_support_page_related_con"""
+        nir = self.nir
+        red = self.red
 
-    def threshold_ndvi(self, threshold=0.38, mask=None):
+        return (nir - red) / (nir + red)
+
+    #    return self._veg_proc('sr_ndvi')
+#
+#    def threshold_ndvi(self, threshold=0.38, mask=None):
+#        """
+#        returns mask where 1 if ndvi is greater than threshold
+#        and 0 if less or equal to threshold
+#        """
+#        assert threshold >= -1.0
+#        assert threshold <= 1.0
+#
+#        ndvi = self.ndvi
+#
+#        if mask is not None:
+#            ndvi = np.ma.array(ndvi, mask=mask)
+#
+#        mask = np.zeros(ndvi.shape, dtype=np.uint8)
+#        mask[np.where(ndvi > threshold)] = 1
+#        return mask
+
+    def threshold(self, indexname, threshold=0.38, mask=None):
         """
-        returns mask where 1 if ndvi is greater than threshold
+        returns mask where 1 if index is greater than threshold
         and 0 if less or equal to threshold
         """
         assert threshold >= -1.0
         assert threshold <= 1.0
 
-        ndvi = self.ndvi
+        data = self.get_index(indexname)
 
         if mask is not None:
-            ndvi = np.ma.array(ndvi, mask=mask)
+            data = np.ma.array(data, mask=mask)
 
-        mask = np.zeros(ndvi.shape, dtype=np.uint8)
-        mask[np.where(ndvi > threshold)] = 1
+        mask = np.zeros(data.shape, dtype=np.uint8)
+        mask[np.where(data > threshold)] = 1
         return mask
 
     @property
     def evi(self):
-        return self._veg_proc('sr_evi')
+        """
+        https://www.usgs.gov/land-resources/nli/landsat/landsat-enhanced-vegetation-index?qt-science_support_page_related_con=0#qt-science_support_page_related_con
+        https://en.wikipedia.org/wiki/Enhanced_vegetation_index
+        """
+
+        nir = self.nir
+        red = self.red
+        blue = self.blue
+        g = 2.5
+        c1 = 6.0
+        c2 = 7.5
+        L = 1
+
+        return g * ((nir - red) / (nir + c1 * red - c2 * blue + L))
+
+    #    return self._veg_proc('sr_evi')
 
     @property
     def savi(self):
-        return self._veg_proc('sr_savi')
+        nir = self.nir
+        red = self.red
+        L = 0.5
+
+        return ((nir - red) / (nir + red + L)) * (1 + L)
+
+    #    return self._veg_proc('sr_savi')
 
     @property
     def msavi(self):
-        return self._veg_proc('sr_msavi')
+        nir = self.nir
+        red = self.red
+
+        return (2.0 * nir + 1.0 - np.sqrt( (2.0 * nir + 1.0)**2.0 - 8.0 * (nir - red))) / 2.0
+
+    #    return self._veg_proc('sr_msavi')
 
     @property
     def ndmi(self):
-        return self._veg_proc('sr_ndmi')
+        """https://www.usgs.gov/land-resources/nli/landsat/normalized-difference-moisture-index"""
+        nir = self.nir
+        swir = self.swir1
+
+        return (nir - swir) / (nir + swir)
+
+    #    return self._veg_proc('sr_ndmi')
 
     @property
     def nbr(self):
-        return self._veg_proc('sr_nbr')
+        """https://www.usgs.gov/land-resources/nli/landsat/landsat-normalized-burn-ratio"""
+        nir = self.nir
+        swir = self.swir2
+
+        return (nir - swir) / (nir + swir)
+
+    #    return self._veg_proc('sr_nbr')
 
     @property
     def nbr2(self):
-        return self._veg_proc('sr_nbr2')
+        """https://www.usgs.gov/land-resources/nli/landsat/landsat-normalized-burn-ratio-2"""
+        swir1 = self.swir1
+        swir2 = self.swir2
+
+        return (swir1 - swir2) / (swir1 + swir2)
+
+    #    return self._veg_proc('sr_nbr2')
 
     @property
     def template_ds(self):
