@@ -11,41 +11,43 @@
 # [-1.21568512e+02,  1.17219025e+03,  5.22496039e+01,  3.40053271e+02, 9.91636476e-02]
 # [-121.568512,  1172.19025,  52.2496039,  340.053271, 0.0991636476]
 #  fall_int,     fall_slp,    summer_int,  summer_slp, dis_par
+
+# -133.5467319	1240.217879	52.44625952	379.8616589	0.128342137
 models:
     - name: Herbaceous
       satellite_pars:
           - satellite: 8
-            discriminate_threshold: 0.0991636476
+            discriminate_threshold: 0.128342137
             discriminate_index: psri
-            summer_int: 52.2496039
-            summer_slp: 340.053271
+            summer_int: 52.44625952
+            summer_slp: 379.8616589
             summer_index: nbr
-            fall_int: -121.568512
-            fall_slp: 1172.19025
+            fall_int: -133.5467319
+            fall_slp: 1240.217879
             fall_index: nbr2
             required_coverage: 0.5
             minimum_area_ha: 1.8
             log_transformed_estimate: False
           - satellite: 7
-            discriminate_threshold: 0.0991636476
+            discriminate_threshold: 0.128342137
             discriminate_index: psri
-            summer_int: 52.2496039
-            summer_slp: 340.053271
+            summer_int: 52.44625952
+            summer_slp: 379.8616589
             summer_index: nbr
-            fall_int: -121.568512
-            fall_slp: 1172.19025
+            fall_int: -133.5467319
+            fall_slp: 1240.217879
             fall_index: nbr2
             required_coverage: 0.5
             minimum_area_ha: 1.8
             log_transformed_estimate: False
           - satellite: 5
-            discriminate_threshold: 0.0991636476
+            discriminate_threshold: 0.128342137
             discriminate_index: psri
-            summer_int: 52.2496039
-            summer_slp: 340.053271
+            summer_int: 52.44625952
+            summer_slp: 379.8616589
             summer_index: nbr
-            fall_int: -121.568512
-            fall_slp: 1172.19025
+            fall_int: -133.5467319
+            fall_slp: 1240.217879
             fall_index: nbr2
             required_coverage: 0.5
             minimum_area_ha: 1.8
@@ -64,7 +66,7 @@ out_dir: /geodata/torch-landsat/rangesat/SageSteppe/analyzed_rasters
 # directory containing extracted landsat scenes
 landsat_scene_directory: /geodata/torch-landsat
 
-wrs_whitelist: []
+wrs_whitelist: [040030, 041030]
 
 # path rows that should be skipped
 wrs_blacklist: []

@@ -23,7 +23,7 @@ from all_your_base import SCRATCH, RANGESAT_DIRS
 _metrics = ('ndvi', 'nbr', 'nbr2', 'evi', 'tcg', 'tcb', 'tcw', 'savi',
             'msavi', 'ndmi', 'sr', 'rdvi', 'mtvii', 'psri', 'ci', 'nci',
             'ndci', 'satvi', 'sf', 'ndii7', 'ndwi', 'sti',
-            'swir1', 'swir2', 'swir_ratio')
+            'swir1', 'swir2', 'swir_ratio', 'aerosol')
 
 
 if __name__ == "__main__":

@@ -5,29 +5,41 @@ models:
     - name: Herbaceous
       satellite_pars:
           - satellite: 8
-            ndvi_threshold: 0.38
+            discriminate_threshold: 0.38
+            discriminate_index: ndvi
             summer_int: 101.09
             summer_slp: 330.25
+            summer_index: nbr
             fall_int: -58.04
             fall_slp: 1070.64
-            required_coverage: 0.33
+            fall_index: nbr2
+            required_coverage: 0.5
             minimum_area_ha: 1.8
+            log_transformed_estimate: False
           - satellite: 7
-            ndvi_threshold: 0.32
+            discriminate_threshold: 0.32
+            discriminate_index: ndvi
             summer_int: 104.06
             summer_slp: 343.18
+            summer_index: nbr
             fall_int: -56.45
             fall_slp: 1042.00
-            required_coverage: 0.33
+            fall_index: nbr2
+            required_coverage: 0.5
             minimum_area_ha: 1.8
+            log_transformed_estimate: False
           - satellite: 5
-            ndvi_threshold: 0.32
+            discriminate_threshold: 0.32
+            discriminate_index: ndvi
             summer_int: 104.06
             summer_slp: 343.18
+            summer_index: nbr
             fall_int: -56.45
             fall_slp: 1042.00
-            required_coverage: 0.33
+            fall_index: nbr2
+            required_coverage: 0.5
             minimum_area_ha: 1.8
+            log_transformed_estimate: False
 
 # shapefile containing pastures to analyze
 sf_fn: /space/rangesat/Zumwalt/vector_data/Pastures_ForageAreas_2018_AllZumClip.shp
@@ -44,3 +56,5 @@ landsat_scene_directory: /geodata/torch-landsat
 
 # path rows that should be skipped
 wrs_blacklist: []
+
+wrs_whitelist: [042028, 043028, 042029]
