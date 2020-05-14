@@ -775,18 +775,25 @@ def _handle_pasturestat_request(data, csv, units='si', drop=None, additions=None
     if units != 'si':
         if isinstance(data, dict):
             _data = {}
-            for key, value in data.items():
-                if drop is not None:
-                    if key in drop:
-                        continue
+            for k, v in data.items():
+                _data[k] = []
+                for i, _v in enumerate(v):
+                    _data[k].append({})
+                    for key, value in _v.items():
+                        if drop is not None:
+                            if key in drop:
+                                continue
 
-                if 'gpm' in key:
-                    value *= 8.92179
-                if 'kg' in key:
-                    value *= 2.204623
-                key = key.replace('gpm', 'lbperacre').replace('kg', 'lb')
-                _data[key] = value
+                        if value is None:
+                            _data[k][i][key.replace('gpm', 'lbperacre').replace('kg', 'lb')] = value
+                            continue
 
+                        if 'gpm' in key:
+                            value *= 8.92179
+                        if 'kg' in key:
+                            value *= 2.204623
+
+                        _data[k][i][key.replace('gpm', 'lbperacre').replace('kg', 'lb')] = value
         else:
             _data = []
             for row in data:
@@ -824,15 +831,26 @@ def _handle_pasturestat_request(data, csv, units='si', drop=None, additions=None
             _d[key] = addition['value']
 
         if isinstance(_data, dict):
-            _data.update(_d)
+            for k in _data:
+                for i in range(len(_data[k])):
+                    _data[k][i].update(_d)
         else:
             for i in range(len(data)):
                 _data[i].update(_d)
 
     if csv is not None:
+        if isinstance(_data, dict):
+            __data = []
+            for k, v in _data.items():
+                __data.extend(v)
+            _data = __data
+
         file_name = '%s.csv' % csv
         file_path = _join(SCRATCH, file_name)
         fieldnames = list(_data[0].keys())
+
+        if units != 'si':
+            fieldnames = [f.replace('gpm', 'lbperacre').replace('kg', 'lb') for f in fieldnames]
 
         if 'year' in fieldnames:
             fieldnames.remove('year')
@@ -850,6 +868,8 @@ def _handle_pasturestat_request(data, csv, units='si', drop=None, additions=None
             for key, addition in additions.items():
                 fieldnames.remove(key)
                 fieldnames.insert(addition['index'], key)
+
+        # return jsonify(dict(fieldnames=fieldnames, data=_data))
 
         with open(file_path, 'w') as fp:
             csv_wtr = DictWriter(fp, fieldnames=fieldnames)
@@ -957,6 +977,12 @@ def _date_validator(date_str):
 @app.route('/pasturestats/single-year/<location>')
 @app.route('/pasturestats/single-year/<location>/')
 def singleyear_pasturestats(location):
+    """
+    https://rangesat.org/api/pasturestats/single-year/Zumwalt/?ranch=TNC&pasture=A1&year=2018&csv=True
+
+    :param location:
+    :return:
+    """
     try:
         ranch = request.args.get('ranch', None)
         pasture = request.args.get('pasture', None)
@@ -1008,6 +1034,12 @@ def singleyear_pasturestats(location):
 @app.route('/pasturestats/intra-year/<location>')
 @app.route('/pasturestats/intra-year/<location>/')
 def intrayear_pasturestats(location):
+    """
+    https://rangesat.org/api/pasturestats/intra-year/Zumwalt/?ranch=TNC&pasture=A1&year=2018&csv=True
+
+    :param location:
+    :return:
+    """
     try:
         ranch = request.args.get('ranch', None)
         pasture = request.args.get('pasture', None)
@@ -1059,6 +1091,12 @@ def intrayear_pasturestats(location):
 @app.route('/pasturestats/max-pasture-seasonal/<location>')
 @app.route('/pasturestats/max-pasture-seasonal/<location>/')
 def max_seasonal_pasturestats(location):
+    """
+    https://rangesat.org/api/pasturestats/max-pasture-seasonal/Zumwalt/?ranch=TNC&pasture=A1&year=2019&csv=True
+
+    :param location:
+    :return:
+    """
     try:
         ranch = request.args.get('ranch', None)
         pasture = request.args.get('pasture', None)
@@ -1070,6 +1108,9 @@ def max_seasonal_pasturestats(location):
         units = request.args.get('units', 'si')
         drop = request.args.get('drop', None)
 
+        if year is None:
+            year = datetime.now().year
+
         if drop is not None:
             drop = drop.split(';')
 
@@ -1079,7 +1120,8 @@ def max_seasonal_pasturestats(location):
         period = '{start_date} - {end_date}'.format(start_date=_date_formatter(start_date),
                                                     end_date=_date_formatter(end_date))
 
-        additions = dict(date_period=dict(value=period, index=2))
+        additions = dict(year=dict(value=year, index=2),
+                         date_period=dict(value=period, index=2))
 
         if csv is not None:
             csv = 'pasturestats-max-pasture-seasonal_ranch={ranch},pasture={pasture},'\
@@ -1116,6 +1158,9 @@ def singleyearmonthly_pasturestats(location):
         units = request.args.get('units', 'si')
         drop = request.args.get('drop', None)
 
+        if year is None:
+            year = datetime.now().year
+
         if drop is not None:
             drop = drop.split(';')
 
@@ -1124,6 +1169,8 @@ def singleyearmonthly_pasturestats(location):
                   'year={year},agg_func={agg_func}'\
                   .format(ranch=ranch, pasture=pasture,
                           year=year, agg_func=agg_func.__name__)
+
+        additions = dict(year=dict(value=year, index=2))
 
         if agg_func is None:
             return jsonify(None)
@@ -1137,7 +1184,7 @@ def singleyearmonthly_pasturestats(location):
                 data = query_singleyearmonthly_pasture_stats(db_fn, ranch=ranch, pasture=pasture, year=year,
                                                              agg_func=agg_func,
                                                              key_delimiter=_location.key_delimiter)
-                return _handle_pasturestat_request(data, csv, units=units, drop=drop)
+                return _handle_pasturestat_request(data, csv, units=units, drop=drop, additions=additions)
 
         return jsonify(None)
 
@@ -1147,6 +1194,12 @@ def singleyearmonthly_pasturestats(location):
 @app.route('/pasturestats/seasonal-progression/<location>')
 @app.route('/pasturestats/seasonal-progression/<location>/')
 def seasonalprogression_pasturestats(location):
+    """
+    https://rangesat.org/api/pasturestats/seasonal-progression/Zumwalt/?ranch=TNC&pasture=A1&start_year=2000&end_year=2019&csv=True
+
+    :param location:
+    :return:
+    """
     try:
         ranch = request.args.get('ranch', None)
         pasture = request.args.get('pasture', None)
@@ -1195,6 +1248,12 @@ def seasonalprogression_pasturestats(location):
 @app.route('/pasturestats/inter-year/<location>')
 @app.route('/pasturestats/inter-year/<location>/')
 def interyear_pasturestats(location):
+    """
+    https://rangesat.org/api/pasturestats/inter-year/Zumwalt/?ranch=TNC&pasture=A1&start_year=2000&end_year=2019&csv=True
+
+    :param location:
+    :return:
+    """
     try:
         ranch = request.args.get('ranch', None)
         pasture = request.args.get('pasture', None)
@@ -1255,6 +1314,12 @@ def interyear_pasturestats(location):
 @app.route('/pasturestats/multi-year/<location>')
 @app.route('/pasturestats/multi-year/<location>/')
 def multiyear_pasturestats(location):
+    """
+    https://rangesat.org/api/pasturestats/multi-year/Zumwalt/?ranch=TNC&pasture=A1&start_year=2000&end_year=2019&csv=True
+
+    :param location:
+    :return:
+    """
     try:
         ranch = request.args.get('ranch', None)
         pasture = request.args.get('pasture', None)
@@ -1466,7 +1531,6 @@ def gridmet_allyears_pasture(location, ranch, pasture):
         return exception_factory()
 
 
-
 @app.route('/gridmet/single-year/<location>/<ranch>/<pasture>')
 @app.route('/gridmet/single-year/<location>/<ranch>/<pasture>/')
 def gridmet_singleyear_pasture(location, ranch, pasture):
@@ -1497,7 +1561,6 @@ def gridmet_singleyear_pasture(location, ranch, pasture):
 
     except Exception:
         return exception_factory()
-
 
 
 @app.route('/gridmet/single-year-monthly/<location>/<ranch>/<pasture>')

@@ -263,9 +263,11 @@ for location in locations:
     conn.commit()
 
     if location == "Zumwalt":
-        c.execute("""DELETE FROM pasture_stats FROM pasture_stats == "6 Ranch All";""")
-        c.execute("""UPDATE pastures_stats SET key = "P 3A+Probert", ranch = "Probert" WHERE pasture == "P 3A";""")
-        c.execute("""UPDATE pastures_stats SET key = "P 2+Probert", ranch = "Probert" WHERE pasture == "P 2";""")
+        c.execute("""DELETE FROM pasture_stats WHERE pasture == "6 Ranch All";""")
+        c.execute("""UPDATE pasture_stats SET key = "P 3A+Probert", ranch = "Probert" WHERE pasture == "P 3A";""")
+        c.execute("""UPDATE pasture_stats SET key = "P 2+Probert", ranch = "Probert" WHERE pasture == "P 2";""")
+        c.execute("""UPDATE pasture_stats SET key = "P 1+Probert", ranch = "Probert" WHERE pasture == "P 1";""")
+        c.execute("""UPDATE pasture_stats SET key = "P 8+Probert", ranch = "Probert" WHERE pasture == "P 8";""")
 
     # Save (commit) the changes
     conn.commit()

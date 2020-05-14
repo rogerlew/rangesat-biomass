@@ -17,7 +17,7 @@ models:
       satellite_pars:
           - satellite: 8
             discriminate_threshold: 0.408655163
-            discriminate_index: psri
+            discriminate_index: ndvi
             summer_int: 53.9852946
             summer_slp: 553.166500
             summer_index: nbr
@@ -29,7 +29,7 @@ models:
             log_transformed_estimate: False
           - satellite: 7
             discriminate_threshold: 0.408655163
-            discriminate_index: psri
+            discriminate_index: ndvi
             summer_int: 53.9852946
             summer_slp: 553.166500
             summer_index: nbr
@@ -41,7 +41,7 @@ models:
             log_transformed_estimate: False
           - satellite: 5
             discriminate_threshold: 0.408655163
-            discriminate_index: psri
+            discriminate_index: ndvi
             summer_int: 53.9852946
             summer_slp: 553.166500
             summer_index: nbr
