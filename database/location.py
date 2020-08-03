@@ -83,6 +83,10 @@ class Location(object):
         return self._d.get('sf_feature_properties_delimiter', '+')
 
     @property
+    def representative_pasture(self):
+        return self._d['representative_pasture']
+
+    @property
     def models(self):
         return self._d['models']
 
@@ -132,15 +136,56 @@ class Location(object):
 
             _pasture, _ranch = key.split(self.key_delimiter)
 
-            if _pasture.lower() == pasture.lower() and _ranch.lower() == ranch.lower():
-                features.append(feature['geometry'])
+            if _ranch.lower() == ranch.lower():
+                if pasture is None:
+                    features.append(feature['geometry'])
+                elif _pasture.lower() == pasture.lower():
+                        features.append(feature['geometry'])
 
         ds = rasterio.open(raster_fn)
         data = ds.read(1, masked=True)
+
+        if 'biomass' in raster_fn:
+            data = np.ma.masked_values(data, 0)
+
         pasture_mask, _, _ = raster_geometry_mask(ds, features)
 
         x = data[np.logical_not(pasture_mask)]
-        return [float(x) for x in x[x.mask == False]]
+        return [float(x) for x in x[x.mask == False]], int(np.sum(np.logical_not(pasture_mask)))
+
+    def extract_pixels_by_pasture(self, raster_fn, ranch=None):
+
+        if ranch is not None:
+            ranch = ranch.replace(' ', '_')
+
+        loc_path = self.loc_path
+        _d = self._d
+
+        sf_fn = _join(loc_path, _d['sf_fn'])
+        sf_feature_properties_key = _d['sf_feature_properties_key']
+        sf_fn = os.path.abspath(sf_fn)
+        sf = fiona.open(sf_fn, 'r')
+
+        ds = rasterio.open(raster_fn)
+        data = ds.read(1, masked=True)
+
+        if 'biomass' in raster_fn:
+            data = np.ma.masked_values(data, 0)
+
+        _data = {}
+        for feature in sf:
+            properties = feature['properties']
+            key = properties[sf_feature_properties_key].replace(' ', '_')
+
+            _pasture, _ranch = key.split(self.key_delimiter)
+
+            if _ranch.lower() == ranch.lower():
+                pasture_mask, _, _ = raster_geometry_mask(ds, [feature['geometry']])
+
+                x = data[np.logical_not(pasture_mask)]
+                _data[(_ranch, _pasture)] = [float(x) for x in x[x.mask == False]], int(np.sum(np.logical_not(pasture_mask)))
+
+        return _data
 
     def get_pasture_indx(self, raster_fn, pasture, ranch):
 

@@ -188,7 +188,7 @@ if len(catalog) <= 0:
 
 current_year = datetime.now().year
 
-locations = ['JISA', 'PAVA']
+locations = ['JISA', 'PAVA', 'Zumwalt', 'SageSteppe']
 
 for location in locations:
     _location = None
@@ -205,8 +205,8 @@ for location in locations:
     e, n, w, s = bbox
     bbox = (e, s, w, n)
 
-    y0 = 2019
-    yend = 2019
+    y0 = 2020
+    yend = 2020
     for landsat_num in [8, 7]:
         for yr in range(y0, yend+1):
             place_order(bbox=bbox,

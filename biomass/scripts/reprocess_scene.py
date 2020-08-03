@@ -15,6 +15,8 @@ from os.path import join as _join
 from os.path import exists as _exists
 from os.path import split as _split
 
+import os
+
 import fiona
 import rasterio
 
@@ -182,5 +184,6 @@ if __name__ == '__main__':
 
     res = reprocess_scene(scene_fn)
 
-    prefix = _split(scene_fn)[-1].replace('.tar.gz', '')
+    prefix = os.path.basename(os.path.normpath(scene_fn)).replace('.tar.gz', '')
+
     dump_pasture_stats([res], _join(out_dir, '%s_pasture_stats.csv' % prefix))

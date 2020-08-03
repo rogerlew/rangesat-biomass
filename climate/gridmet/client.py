@@ -185,7 +185,7 @@ if __name__ == "__main__":
     end_year = 2020
 
     met_dir = _join(_location.loc_path, 'gridmet')
-    #print(met_dir)
+    print(met_dir)
 
     if exists(met_dir):
         shutil.rmtree(met_dir)

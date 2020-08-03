@@ -635,24 +635,6 @@ class LandSatScene(object):
 
         return (nir - red) / (nir + red)
 
-    #    return self._veg_proc('sr_ndvi')
-#
-#    def threshold_ndvi(self, threshold=0.38, mask=None):
-#        """
-#        returns mask where 1 if ndvi is greater than threshold
-#        and 0 if less or equal to threshold
-#        """
-#        assert threshold >= -1.0
-#        assert threshold <= 1.0
-#
-#        ndvi = self.ndvi
-#
-#        if mask is not None:
-#            ndvi = np.ma.array(ndvi, mask=mask)
-#
-#        mask = np.zeros(ndvi.shape, dtype=np.uint8)
-#        mask[np.where(ndvi > threshold)] = 1
-#        return mask
 
     def threshold(self, indexname, threshold=0.38, mask=None):
         """

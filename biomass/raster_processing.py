@@ -13,9 +13,10 @@ def make_raster_difference(scn_fn1, scn_fn2, dst_fn, nodata=-9999.0):
     ds = rasterio.open(scn_fn1)
     ds2 = rasterio.open(scn_fn2)
 
-    _data1 = ds.read()
-    _data2 = ds2.read()
+    _data1 = np.ma.masked_values(ds.read(), nodata)
+    _data2 = np.ma.masked_values(ds2.read(), nodata)
     assert _data1.shape == _data2.shape
+
 
     data = (_data2[0, :, :] - _data1[0, :, :]) / _data1[0, :, :]
 

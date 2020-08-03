@@ -54,14 +54,14 @@ models:
             log_transformed_estimate: False
 
 # shapefile containing pastures to analyze
-sf_fn: /geodata/torch-landsat/rangesat/SageSteppe/vector_data/RockCreekRanch_habitatmodeled.shp
+sf_fn: /geodata/nas/rangesat/SageSteppe/vector_data/RockCreekRanch_200522.utm11.shp
 
 # primary key for pastures in shapefile
 # e.g. key = feature['properties'][sf_feature_properties_key]
 sf_feature_properties_key: PastID_Key
 
 # location to place cropped landsat scenes and biomass rasters
-out_dir: /geodata/torch-landsat/rangesat/SageSteppe/analyzed_rasters
+out_dir: /geodata/nas/rangesat/SageSteppe/analyzed_rasters
 
 # directory containing extracted landsat scenes
 landsat_scene_directory: /geodata/torch-landsat

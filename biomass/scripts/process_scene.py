@@ -203,5 +203,6 @@ if __name__ == '__main__':
 
     res = process_scene(scene_fn)
 
-    prefix = _split(scene_fn)[-1].replace('.tar.gz', '')
+    prefix = os.path.basename(os.path.normpath(scene_fn)).replace('.tar.gz', '')
+
     dump_pasture_stats([res], _join(out_dir, '%s_pasture_stats.csv' % prefix))

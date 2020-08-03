@@ -220,6 +220,11 @@ class BiomassModel(object):
             pasture_mask, _, _ = raster_geometry_mask(ls.template_ds, features)
             not_pasture_mask = np.logical_not(pasture_mask)
 
+            if np.sum(not_pasture_mask) == 0:
+                print(features)
+                print(ls.product_id)
+                raise
+
             total_px = np.sum(not_pasture_mask)
             snow_px = np.sum(np.ma.array(qa_snow, mask=pasture_mask))
             water_px = np.sum(np.ma.array(qa_water, mask=pasture_mask))
@@ -238,6 +243,11 @@ class BiomassModel(object):
 
             area_ha = total_px * cellsize * cellsize * 0.0001
 
+            pasture, ranch = key.split('+')
+            if pasture in 'ABCDEFGHIJKLMNO':
+                area_ha = 2.0
+                coverage = 1.0
+
             model_stats = {}  # dictionary of dictionaries for each model
             for m in models:
                 m_sat = m[sat]
@@ -245,6 +255,8 @@ class BiomassModel(object):
                 d = ModelStat(model=m.name)
 
                 if coverage > m_sat.required_coverage and area_ha > m_sat.minimum_area_ha:
+                    print(pasture)
+
                     # get masked array of the biomass
                     pasture_biomass = np.ma.array(biomass[m.name], mask=pasture_mask)
 

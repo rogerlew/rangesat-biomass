@@ -283,6 +283,57 @@ def query_singleyearmonthly_pasture_stats(db_fn, ranch=None, pasture=None, year=
     return agg
 
 
+def query_singleyearmonthly_ranch_stats(db_fn, ranch=None, year=None,
+                                        start_date=None, end_date=None,
+                                        agg_func=np.mean,
+                                        key_delimiter='+'):
+    if year is None:
+        year = datetime.now().year
+
+    if start_date is None:
+        start_date = '1-1'
+
+    if end_date is None:
+        end_date = '12-31'
+
+    rows = query_singleyear_pasture_stats(db_fn, ranch=ranch, pasture=None, year=year,
+                                          start_date=start_date, end_date=end_date, agg_func=agg_func,
+                                          key_delimiter=key_delimiter)
+
+    keys = set(row['key'].split(key_delimiter)[-1] for row in rows)
+
+    monthlies = {_ranch: [[] for i in range(12)] for _ranch in keys}
+    for i, row in enumerate(rows):
+        if row['biomass_mean_gpm'] is None:
+            continue
+
+        if row['biomass_mean_gpm'] == 0:
+            continue
+
+        if row['coverage'] < 0.5:
+            continue
+
+        _pasture, _ranch = row['key'].split(key_delimiter)
+
+        month_indx = int(row['acquisition_date'].split('-')[1]) - 1
+
+        assert 0 <= month_indx <= 11, month_indx
+        monthlies[_ranch][month_indx].append(row)
+
+    agg = {}
+    for _ranch in keys:
+        _monthlies = []
+
+        for i, d in enumerate(monthlies[_ranch]):
+            _monthlies.append(_aggregate(d, agg_func))
+            _monthlies[-1]['ranch'] = _ranch
+            _monthlies[-1]['month'] = _month_labels[i]
+
+        agg[_ranch] = _monthlies
+
+    return agg
+
+
 def query_seasonalprogression_pasture_stats(db_fn, ranch=None, pasture=None,
                                             start_year=None, end_year=None,
                                             agg_func=np.mean, key_delimiter='+'):
@@ -357,6 +408,87 @@ def query_seasonalprogression_pasture_stats(db_fn, ranch=None, pasture=None,
             _monthlies[-1]['month'] = _month_labels[i]
 
         agg[key] = _monthlies
+
+    return agg
+
+
+def query_seasonalprogression_ranch_stats(db_fn, ranch=None,
+                                            start_year=None, end_year=None,
+                                            agg_func=np.mean, key_delimiter='+'):
+
+    pasture = None
+
+    if end_year is None:
+        end_year = datetime.now().year
+    else:
+        end_year = int(end_year)
+
+    if start_year is None:
+        start_year = 1981
+    else:
+        start_year = int(start_year)
+
+    conn = sqlite3.connect(db_fn)
+    c = conn.cursor()
+
+    query = 'SELECT ' + \
+            ', '.join(_header) + \
+            ' FROM pasture_stats'
+
+    i = 0
+    if ranch is not None or pasture is not None:
+        query += ' WHERE'
+
+    if ranch is not None:
+        query += ' ranch = "{ranch}"'.format(ranch=ranch.replace('_', ' '))
+        i += 1
+
+    if pasture is not None:
+        if i > 0:
+            query += ' AND'
+        query += ' pasture = "{pasture}"'.format(pasture=pasture.replace('_', ' ')
+                                                                .replace('Derrick Old', 'Derrick_Old'))
+        i += 1
+
+    c.execute(query)
+    rows = c.fetchall()
+    rows = [dict(zip(_header, row)) for row in rows]
+
+    keys = set(row['key'].split(key_delimiter)[-1] for row in rows)
+
+    monthlies = {_ranch: [[] for i in range(12)] for _ranch in keys}
+    for i, row in enumerate(rows):
+        if row['biomass_mean_gpm'] is None:
+            continue
+
+        if row['biomass_mean_gpm'] == 0:
+            continue
+
+        if row['coverage'] < 0.5:
+            continue
+
+        yr, mo, da = map(int, row['acquisition_date'].split('-'))
+
+        if not start_year <= yr <= end_year:
+            continue
+
+        _pasture, _ranch = row['key'].split(key_delimiter)
+
+        month_indx = mo - 1
+
+        assert 0 <= month_indx <= 11, month_indx
+        monthlies[_ranch][month_indx].append(row)
+
+    agg = {}
+    for _ranch in keys:
+        _monthlies = []
+
+        for i, d in enumerate(monthlies[_ranch]):
+            _monthlies.append(_aggregate(d, agg_func))
+            _monthlies[-1]['ranch'] = _ranch
+            _monthlies[-1]['month'] = _month_labels[i]
+
+        agg[_ranch] = _monthlies
 
     return agg
 
@@ -485,6 +617,73 @@ def query_multiyear_pasture_stats(db_fn, ranch=None, pasture=None, start_year=No
             agg[-1]['year'] = year
 
     return sorted(agg, key=_sortkeypicker(['ranch', 'pasture', 'year']))
+
+
+
+def query_multiyear_ranch_stats(db_fn, ranch=None, pasture=None, start_year=None, end_year=None,
+                                  start_date=None, end_date=None, agg_func=np.mean,
+                                  key_delimiter='+'):
+    if end_year is None:
+        end_year = datetime.now().year
+    if start_year is None:
+        start_year = 1981
+
+    if start_date is None:
+        start_date = '1-1'
+
+    if end_date is None:
+        end_date = '12-31'
+
+    conn = sqlite3.connect(db_fn)
+    c = conn.cursor()
+
+    query = 'SELECT ' + \
+            ', '.join(_header) + \
+            ' FROM pasture_stats'
+
+    i = 0
+    if ranch is not None or pasture is not None:
+        query += ' WHERE'
+
+    if ranch is not None:
+        query += ' ranch = "{ranch}"'.format(ranch=ranch.replace('_', ' '))
+        i += 1
+
+    if pasture is not None:
+        if i > 0:
+            query += ' AND'
+        query += ' pasture = "{pasture}"'.format(pasture=pasture.replace('_', ' ').replace('Derrick Old', 'Derrick_Old'))
+        i += 1
+
+    c.execute(query)
+    rows = c.fetchall()
+    dates = [date(*map(int, row[-1].split('-'))) for row in rows]
+    keys = set(row[1].split(key_delimiter)[-1] for row in rows)
+
+    agg = []
+    start_year = int(start_year)
+    end_year = int(end_year)
+    for year in range(start_year, end_year+1):
+        _start_date = date(*map(int, '{}-{}'.format(year, start_date).split('-')))
+        _end_date = date(*map(int, '{}-{}'.format(year, end_date).split('-')))
+        mask = [_start_date < d < _end_date for d in dates]
+        if not any(mask):
+            continue
+
+        _rows = [dict(zip(_header, row)) for m, row in zip(mask, rows) if m]
+        _rows = [d for d in _rows if d['biomass_mean_gpm'] is not None]
+
+        d = {_ranch: [] for _ranch in keys}
+        for row in _rows:
+            _pasture, _ranch = row['key'].split(key_delimiter)
+            d[_ranch].append(row)
+
+        for _ranch in d:
+            agg.append(_aggregate(d[_ranch], agg_func))
+            agg[-1]['ranch'] = _ranch
+            agg[-1]['year'] = year
+
+    return sorted(agg, key=_sortkeypicker(['ranch', 'year']))
 
 
 if __name__ == "__main__":
