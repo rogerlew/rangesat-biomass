@@ -1715,7 +1715,7 @@ def gridmet_allyears_pasture(location, ranch, pasture=None):
                 _location = Location(loc_path)
                 ranch = ranch.replace("'", "~").replace(' ', '_')
                 if pasture is None:
-                    pasture = _location.representative_pasture
+                    pasture = _location.representative_pasture(ranch)
                 pasture = pasture.replace("'", "~").replace(' ', '_')
                 d = load_gridmet_all_years(_join(_location.loc_path, 'gridmet', ranch, pasture),
                                            start_year, end_year, units)
@@ -1756,7 +1756,7 @@ def gridmet_singleyear_pasture(location, ranch, pasture=None):
                 _location = Location(loc_path)
                 ranch = ranch.replace("'", "~").replace(' ', '_')
                 if pasture is None:
-                    pasture = _location.representative_pasture
+                    pasture = _location.representative_pasture(ranch)
                 pasture = pasture.replace("'", "~").replace(' ', '_')
                 directory = _join(_location.loc_path, 'gridmet', ranch, pasture)
                 d = load_gridmet_single_year(directory, year, units)
@@ -1798,7 +1798,7 @@ def gridmet_singleyearmonthly_pasture(location, ranch, pasture=None):
                 _location = Location(loc_path)
                 ranch = ranch.replace("'", "~").replace(' ', '_')
                 if pasture is None:
-                    pasture = _location.representative_pasture
+                    pasture = _location.representative_pasture(ranch)
                 pasture = pasture.replace("'", "~").replace(' ', '_')
                 d = load_gridmet_single_year_monthly(_join(_location.loc_path, 'gridmet', ranch, pasture),
                                                      year, units)
@@ -1839,7 +1839,7 @@ def gridmet_annualprogression_pasture(location, ranch, pasture=None):
                 _location = Location(loc_path)
                 ranch = ranch.replace("'", "~").replace(' ', '_')
                 if pasture is None:
-                    pasture = _location.representative_pasture
+                    pasture = _location.representative_pasture(ranch)
                 pasture = pasture.replace("'", "~").replace(' ', '_')
                 d = load_gridmet_annual_progression(_join(_location.loc_path, 'gridmet', ranch, pasture),
                                                     start_year, end_year, units)
@@ -1880,7 +1880,7 @@ def gridmet_annualprogression_monthly_pasture(location, ranch, pasture=None):
                 _location = Location(loc_path)
                 ranch = ranch.replace("'", "~").replace(' ', '_')
                 if pasture is None:
-                    pasture = _location.representative_pasture
+                    pasture = _location.representative_pasture(ranch)
                 pasture = pasture.replace("'", "~").replace(' ', '_')
                 d = load_gridmet_annual_progression_monthly(_join(_location.loc_path, 'gridmet', ranch, pasture),
                                                             start_year, end_year, units)

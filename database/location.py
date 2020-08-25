@@ -82,9 +82,30 @@ class Location(object):
     def key_delimiter(self):
         return self._d.get('sf_feature_properties_delimiter', '+')
 
-    @property
-    def representative_pasture(self):
-        return self._d['representative_pasture']
+    def representative_pasture(self, ranch):
+        if ranch is not None:
+            ranch = ranch.replace(' ', '_')
+
+        if ranch not in self.pastures:
+            return None
+
+        area_ha, bbox = self.shape_inspection(ranch)
+        pastures = sorted(list(self.pastures[ranch]))
+
+        center_x = (bbox[0] + bbox[2]) / 2.0
+        center_y = (bbox[1] + bbox[2]) / 2.0
+
+        distance = 1e38
+        rep = None
+        for pasture in pastures:
+            p_x, p_y = self.serialized_pasture(ranch, pasture)['centroid']
+            _distance = (center_x - p_x) ** 2.0 + (center_y - p_y) ** 2.0
+
+            if _distance < distance:
+                rep = pasture
+                distance = _distance
+
+        return rep
 
     @property
     def models(self):
@@ -473,7 +494,6 @@ class Location(object):
             key = f['properties'][sf_feature_properties_key].replace(' ', '_')
             _pasture, _ranch = key.split(self.key_delimiter)
 
-            print(pasture)
 
             if (ranch is None or _ranch.lower() == ranch.lower()) and \
                (pasture is None or _pasture.lower() == pasture.lower()):
