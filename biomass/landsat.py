@@ -70,15 +70,18 @@ class LandSatScene(object):
         self._build_bqa()
 
     def __open_dir(self, fn):
-        fns = glob(_join(fn, '*'))
+        fns = glob(_join(fn, '*.xml'))
 
-        target_fn = [fn for fn in fns if fn.endswith('ndvi.tif')][0]
-        product_id = '_'.join(_split(target_fn)[-1].split('_')[:7])
+        assert len(fns) == 1, fns
+        product_id = _split(fns[0])[-1][:-4]
+
+        if product_id.endswith('_'):
+            product_id = product_id[:-1]
 
         print('product_id', product_id)
 
         d = {}
-        for fn in fns:
+        for fn in glob(_join(fn, '*')):
             key = _split(fn)[-1].replace('%s_' % product_id, '')\
                                 .replace('.tif', '')
 
@@ -791,7 +794,7 @@ class LandSatScene(object):
                 continue
 
             if '.xml' in measure:
-                dst_fn = _join(outdir, '%s_%s' % (self.product_id, measure))
+                dst_fn = _join(outdir, '%s.xml' % self.product_id)
                 with open(dst_fn, 'w') as fp:
                     fp.write(src)
                 continue
