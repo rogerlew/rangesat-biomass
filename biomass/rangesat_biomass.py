@@ -8,6 +8,7 @@ from math import sqrt
 
 from os.path import join as _join
 from os.path import exists as _exists
+import warnings
 
 import rasterio
 from rasterio.mask import raster_geometry_mask
@@ -221,9 +222,7 @@ class BiomassModel(object):
             not_pasture_mask = np.logical_not(pasture_mask)
 
             if np.sum(not_pasture_mask) == 0:
-                print(features)
-                print(ls.product_id)
-                raise
+                warnings.warn('{} in {} has zero pixels in mask'.format(key, ls.product_id))
 
             total_px = np.sum(not_pasture_mask)
             snow_px = np.sum(np.ma.array(qa_snow, mask=pasture_mask))
