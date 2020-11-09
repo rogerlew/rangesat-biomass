@@ -6,3 +6,5 @@ venv
 temp
 scripts/biomass_rasters/
 scripts/*.tif
+rangesat-biomass-cig-modelling/*
+.DS_Store
