@@ -8,6 +8,8 @@ import sys
 from os.path import join as _join
 from os.path import exists, dirname
 
+import warnings
+
 import numpy as np
 
 import netCDF4
@@ -24,7 +26,7 @@ class GridMetVariable(Enum):
     MinimumTemperature = 2
     MaximumTemperature = 3
     SurfaceRadiation = 4
-    PalmarDroughtSeverityIndex = 5
+#    PalmarDroughtSeverityIndex = 5
     PotentialEvapotranspiration = 6
     BurningIndex = 7
 
@@ -34,11 +36,12 @@ _var_meta = {
     GridMetVariable.MinimumTemperature: ('tmmn', 'air_temperature'),
     GridMetVariable.MaximumTemperature: ('tmmx', 'air_temperature'),
     GridMetVariable.SurfaceRadiation: ('srad', 'surface_downwelling_shortwave_flux_in_air'),
-    GridMetVariable.PalmarDroughtSeverityIndex: ('pdsi', 'palmer_drought_severity_index'),
+#    GridMetVariable.PalmarDroughtSeverityIndex: ('pdsi', 'palmer_drought_severity_index'),
     GridMetVariable.PotentialEvapotranspiration: ('pet', 'potential_evapotranspiration'),
     GridMetVariable.BurningIndex: ('bi', 'burning_index_g'),
 }
 
+# http://thredds.northwestknowledge.net:8080/thredds/ncss/MET/bi/bi_2019.nc?var=burning_index_g
 
 def nc_extract(fn, locations):
     rds = RasterDatasetInterpolator(fn, proj='EPSG:4326')
@@ -102,7 +105,7 @@ def retrieve_timeseries(variables, locations, start_year, end_year, met_dir):
     ll_x, ll_y = min(lons), min(lats)
     ur_x, ur_y = max(lons), max(lats)
 
-    if len(locations) ==  1:
+    if len(locations) == 1:
         ll_x -= 0.04
         ll_y -= 0.04
         ur_x += 0.04
@@ -147,7 +150,10 @@ def retrieve_timeseries(variables, locations, start_year, end_year, met_dir):
 
                 os.remove(fn)
             except:
-                os.remove(fn)
+                warnings.warn(
+                    'Error retrieving ({}, {}, {})'.format(gridvariable, year, fn)
+                )
+                # os.remove(fn)
                 raise
     #return d
 
@@ -156,7 +162,7 @@ if __name__ == "__main__":
     from api.app import RANGESAT_DIRS, Location
     import os
 
-    location = 'Zumwalt'
+    location = 'Zumwalt2'
 
     _location = None
     for rangesat_dir in RANGESAT_DIRS:
