@@ -12,8 +12,8 @@ sys.path.insert(0, '/var/www/rangesat-biomass')
 from api.app import RANGESAT_DIRS, Location
 from all_your_base import isfloat
 
-locations = ['SageSteppe']
-db_fn = '/var/www/rangesat-biomass/sites/SageSteppe/rcr_sqlite3.db'
+locations = ['Zumwalt2']
+db_fn = '/space/rangesat/db/Zumwalt2/_sqlite3.db'
 
 for location in locations:
     _location = None
@@ -262,12 +262,12 @@ for location in locations:
     # Save (commit) the changes
     conn.commit()
 
-    if location == "Zumwalt":
-        c.execute("""DELETE FROM pasture_stats WHERE pasture == "6 Ranch All";""")
-        c.execute("""UPDATE pasture_stats SET key = "P 3A+Probert", ranch = "Probert" WHERE pasture == "P 3A";""")
-        c.execute("""UPDATE pasture_stats SET key = "P 2+Probert", ranch = "Probert" WHERE pasture == "P 2";""")
-        c.execute("""UPDATE pasture_stats SET key = "P 1+Probert", ranch = "Probert" WHERE pasture == "P 1";""")
-        c.execute("""UPDATE pasture_stats SET key = "P 8+Probert", ranch = "Probert" WHERE pasture == "P 8";""")
+#    if location =="Zumwalt":
+#        c.execute("""DELETE FROM pasture_stats WHERE pasture == "6 Ranch All";""")
+#        c.execute("""UPDATE pasture_stats SET key = "P 3A+Probert", ranch = "Probert" WHERE pasture == "P 3A";""")
+#        c.execute("""UPDATE pasture_stats SET key = "P 2+Probert", ranch = "Probert" WHERE pasture == "P 2";""")
+#        c.execute("""UPDATE pasture_stats SET key = "P 1+Probert", ranch = "Probert" WHERE pasture == "P 1";""")
+#        c.execute("""UPDATE pasture_stats SET key = "P 8+Probert", ranch = "Probert" WHERE pasture == "P 8";""")
 
     # Save (commit) the changes
     conn.commit()
