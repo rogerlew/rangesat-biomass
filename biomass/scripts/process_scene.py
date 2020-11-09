@@ -7,7 +7,7 @@ import multiprocessing
 import csv
 import random
 import tarfile
-
+# from subprocess import Popen
 from glob import glob
 from time import time
 
@@ -28,6 +28,11 @@ from all_your_base import get_sf_wgs_bounds, bounds_intersect, SCRATCH
 
 def extract(tar_fn, dst):
     print(tar_fn, dst)
+
+    # cmd = ['tar', '-xvf', tar_fn, '-C', dst]
+    # p = Popen(cmd)
+    # p.wait()
+
     tar = tarfile.open(tar_fn)
     tar.extractall(path=dst)
     tar.close()
@@ -57,7 +62,7 @@ def process_scene(scn_fn, verbose=True):
         ls = None
         _ls = None
         shutil.rmtree(scn_path)
-        return
+        raise
 
     _ls.dump_rgb(_join(ls.basedir, 'rgb.tif'), gamma=1.5)
 
@@ -66,14 +71,18 @@ def process_scene(scn_fn, verbose=True):
     bio_model = BiomassModel(ls, models)
 
     # Export grids
+    print('exporting grids')
     bio_model.export_grids(biomass_dir=_join(ls.basedir, 'biomass'))
 
     # Analyze pastures
+    print('analyzing pastures')
     res = bio_model.analyze_pastures(sf, sf_feature_properties_key)
 
     # get a summary dictionary of the landsat scene
+    print('compiling summary')
     ls_summary = ls.summary_dict()
 
+    print('reprojecting scene')
     scn_dir = _join(out_dir, _ls.product_id)
     reproject_scene(scn_dir)
 
