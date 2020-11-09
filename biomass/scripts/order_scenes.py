@@ -104,8 +104,8 @@ def place_order(bbox,
     # Extract Landsat scene ids for each hit from the metadata
     _scene_list = [x['displayId'] for x in scene_list]
 
-    if verbose:
-        print(scene_list)
+#    if verbose:
+#        print(scene_list)
 
     scene_list = []
     for scene in _scene_list:
@@ -123,7 +123,7 @@ def place_order(bbox,
         #acquisition_date = date(year, month, day)
 
         key = tuple([satellite, wrs_path, wrs_row, year, month, day])
-        print(scene, key)
+        print(key)
         if key in catalog:
             continue
 
@@ -151,11 +151,11 @@ def place_order(bbox,
     else:
         products = products['olitirs8_collection']['products']
 
-    if verbose:
-        print(landsat_num, products)
+#    if verbose:
+#        print(landsat_num, products)
 
     # Place order (full scenes, no reprojection, sr and pixel_qa)
-    order = espa.order(scene_list=scene_list, products=products)#, extent=bbox)
+    order = espa.order(scene_list=scene_list, products=products)  #, extent=bbox)
 
     if verbose:
         print(order.orderid)
@@ -188,8 +188,8 @@ if len(catalog) <= 0:
 
 current_year = datetime.now().year
 
-locations = ['JISA', 'PAVA', 'Zumwalt', 'SageSteppe']
-
+locations = ['Zumwalt']
+pad = 0.2
 for location in locations:
     _location = None
     for rangesat_dir in RANGESAT_DIRS:
@@ -203,10 +203,10 @@ for location in locations:
     area_ha, bbox = _location.shape_inspection()
 
     e, n, w, s = bbox
-    bbox = (e, s, w, n)
-
-    y0 = 2020
-    yend = 2020
+    bbox = (e-pad, s-pad, w+pad, n+pad)
+#    bbox = -117.8270, 46.0027, -116.5416, 45.3048
+    y0 = 2019
+    yend = 2019
     for landsat_num in [8, 7]:
         for yr in range(y0, yend+1):
             place_order(bbox=bbox,
