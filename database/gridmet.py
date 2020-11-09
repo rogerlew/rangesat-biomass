@@ -51,13 +51,17 @@ def load_gridmet_single_year(directory, year, units='SI'):
 
     if d['pr'] is not None and d['pet'] is not None:
         d['pwd'] = [pr - pet for pr, pet in zip(d['pr'], d['pet'])]
+    else:
+        d['pwd'] = None
 
     if units.lower().startswith('e'):
         for var in ['tmmn', 'tmmx']:
-            d[var] = [c_to_f(v) for v in d[var]]
+            if d[var] is not None:
+                d[var] = [c_to_f(v) for v in d[var]]
 
         for var in ['pr', 'pet', 'pwd']:
-            d[var] = [mm_to_in(v) for v in d[var]]
+            if d[var] is not None:
+                d[var] = [mm_to_in(v) for v in d[var]]
 
     return d
 
