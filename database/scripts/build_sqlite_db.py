@@ -12,8 +12,13 @@ sys.path.insert(0, '/var/www/rangesat-biomass')
 from api.app import RANGESAT_DIRS, Location
 from all_your_base import isfloat
 
-locations = ['Zumwalt2']
-db_fn = '/space/rangesat/db/Zumwalt2/_sqlite3.db'
+locations = [sys.argv[-1]]
+
+
+reverse_pasture_ranch_key = '--reverse_key' in  ''.join(sys.argv)
+
+#locations = ['Zumwalt2']
+#db_fn = '/space/rangesat/db/Zumwalt2/_sqlite3.db'
 
 for location in locations:
     _location = None
@@ -26,9 +31,10 @@ for location in locations:
     assert _location is not None
 
     out_dir = _location.out_dir
-    key_delimiter = "+"#_location.
+    key_delimiter = _location.key_delimiter
+    print(_location.out_dir)
 
-    #db_fn = _join(out_dir, '_sqlite3.db')
+    db_fn = _join(out_dir, 'sqlite3.db')
 
     if exists(db_fn):
         os.remove(db_fn)
@@ -52,6 +58,11 @@ for location in locations:
 
     for fn in fns:
         print(fn)
+
+        if 'Zumwalt' in location:
+            if '042029' in fn:
+                continue
+
         with open(fn) as fp:
             reader = csv.reader(fp)
 
@@ -222,9 +233,14 @@ for location in locations:
                         fall_vi_mean_gpm = 'null'
                         fraction_summer = 'null'
 
-                pasture, ranch = key.replace('-RCR', '+RCR').replace('Tripple', 'Triple').split(key_delimiter)
+                pasture, ranch = key.replace('Tripple', 'Triple').split(key_delimiter)
                 _date = product_id.split('_')[3]
                 acquisition_date = date(int(_date[:4]), int(_date[4:6]), int(_date[6:]))
+               
+                if reverse_pasture_ranch_key:
+                    ranch, pasture = pasture, ranch
+                    key = '{}{}{}'.format(pasture, key_delimiter, ranch)
+                    print(ranch, pasture, key) 
 
                 # Insert a row of data
                 query = """INSERT INTO pasture_stats VALUES ("{product_id}","{key}","{pasture}","{ranch}",\

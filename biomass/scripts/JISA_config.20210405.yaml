@@ -1,0 +1,64 @@
+# GandG Base
+
+# multiple models can be defined. e.g. Herbaceous and Shrub
+models:
+    - name: Herbaceous
+      satellite_pars:
+          - satellite: 8
+            discriminate_threshold: null
+            discriminate_index: null
+            summer_int: 82.80456 
+            summer_slp: 0.14034
+            summer_index: tcg
+            fall_int: 0.0
+            fall_slp: -173.72468
+            fall_index: ndci
+            required_coverage: 0.5
+            minimum_area_ha: 1.8
+            log_transformed_estimate: False
+          - satellite: 7
+            discriminate_threshold: null
+            discriminate_index: null
+            summer_int: 82.80456 
+            summer_slp: 0.14034
+            summer_index: tcg
+            fall_int: 0.0
+            fall_slp: -173.72468
+            fall_index: ndci
+            required_coverage: 0.5
+            minimum_area_ha: 1.8
+            log_transformed_estimate: False
+          - satellite: 5
+            discriminate_threshold: null
+            discriminate_index: null
+            summer_int: 82.80456 
+            summer_slp: 0.14034
+            summer_index: tcg
+            fall_int: 0.0
+            fall_slp: -173.72468
+            fall_index: ndci
+            required_coverage: 0.5
+            minimum_area_ha: 1.8
+            log_transformed_estimate: False
+
+# shapefile containing pastures to analyze
+sf_fn: /geodata/nas/rangesat/JISA/vector_data/pastures.shp
+
+# primary key for pastures in shapefile
+# e.g. key = feature['properties'][sf_feature_properties_key]
+sf_feature_properties_key: PastID_Key
+
+sf_feature_properties_delimiter: '+'
+
+# location to place cropped landsat scenes and biomass rasters
+out_dir: /geodata/nas/rangesat/JISA/analyzed_rasters
+
+# directory containing extracted landsat scenes
+landsat_scene_directory: /geodata/torch-landsat
+
+# path rows that should be skipped
+wrs_blacklist: []
+
+wrs_whitelist: []
+
+years: []

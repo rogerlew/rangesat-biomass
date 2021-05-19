@@ -496,6 +496,28 @@ def query_seasonalprogression_ranch_stats(db_fn, ranch=None,
 def query_interyear_pasture_stats(db_fn, ranch=None, pasture=None, start_year=None, end_year=None,
                                   start_date=None, end_date=None, agg_func=np.mean,
                                   key_delimiter='+'):
+
+
+    agg = query_multiyear_pasture_stats(db_fn, ranch, pasture, start_year, end_year, start_date, end_date, agg_func,
+                                        key_delimiter)
+
+    # identify pasture+ranch keys
+    keys = set((res['pasture'], res['ranch']) for res in agg)
+
+    agg2 = []
+
+    for _pasture, _ranch in keys:
+        annuals = []
+        for res in agg:
+            if res['pasture'] == _pasture and res['ranch'] == _ranch:
+                annuals.append(res)
+
+        agg2.append(_aggregate(annuals, agg_func))
+        agg2[-1]['pasture'] = _pasture
+        agg2[-1]['ranch'] = _ranch
+
+    return agg2
+
     conn = sqlite3.connect(db_fn)
     c = conn.cursor()
 
@@ -523,28 +545,41 @@ def query_interyear_pasture_stats(db_fn, ranch=None, pasture=None, start_year=No
     dates = [date(*map(int, row[-1].split('-'))) for row in rows]
     start_year = int(start_year)
     end_year = int(end_year)
+
+    # filter by year
     mask = [start_year < d.year < end_year for d in dates]
 
     for i, (d, m) in enumerate(zip(dates, mask)):
         if not m:
             continue
 
+        # filter by date
         _start_date = date(*map(int, '{}-{}'.format(d.year, start_date).split('-')))
         _end_date = date(*map(int, '{}-{}'.format(d.year, end_date).split('-')))
         mask[i] = _start_date < d < _end_date
 
+    # build list of dicts of pasture stats
     rows = [dict(zip(_header, row)) for m, row in zip(mask, rows) if m]
+
+    # remove stats that don't have biomass
     rows = [d for d in rows if d['biomass_mean_gpm'] is not None]
 
+    # identify pasture+ranch keys
     keys = set(row['key'] for row in rows)
     d = {key: [] for key in keys}
 
+    # group stats by pasture+ranch
     for row in rows:
         d[row['key']].append(row)
 
+    # aggregate over keys
     agg = []
     for key in d:
-        agg.append(_aggregate(d[key], agg_func))
+        annuals = []
+        for year in range(start_year, end_year+1):
+            annuals.append(_aggregate([row for row in d[key] if
+                                       date(*map(int, row['acquisition_date'].split('-'))).year == year], agg_func))
+        agg.append(annuals)
         _pasture, _ranch = key.split(key_delimiter)
         agg[-1]['pasture'] = _pasture
         agg[-1]['ranch'] = _ranch

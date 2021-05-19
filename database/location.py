@@ -6,6 +6,7 @@ from os.path import join as _join
 from os.path import exists as _exists
 from pprint import pprint
 import fiona
+from fiona.transform import transform_geom
 import yaml
 import pyproj
 import numpy as np
@@ -142,6 +143,9 @@ class Location(object):
         if pasture is not None:
             pasture = pasture.replace(' ', '_')
 
+        ds = rasterio.open(raster_fn)
+        ds_proj4 = ds.crs.to_proj4()
+
         loc_path = self.loc_path
         _d = self._d
 
@@ -156,14 +160,18 @@ class Location(object):
             key = properties[sf_feature_properties_key].replace(' ', '_')
 
             _pasture, _ranch = key.split(self.key_delimiter)
+    
+            if ranch is not None:
+                if _ranch.lower() != ranch.lower():
+                    continue
 
-            if _ranch.lower() == ranch.lower():
-                if pasture is None:
-                    features.append(feature['geometry'])
-                elif _pasture.lower() == pasture.lower():
-                        features.append(feature['geometry'])
+            _features = transform_geom(sf.crs_wkt, ds_proj4, feature['geometry'])
 
-        ds = rasterio.open(raster_fn)
+            if pasture is None:
+                features.append(_features)
+            elif _pasture.lower() == pasture.lower():
+                features.append(_features)
+
         data = ds.read(1, masked=True)
 
         if 'biomass' in raster_fn:
@@ -179,6 +187,9 @@ class Location(object):
         if ranch is not None:
             ranch = ranch.replace(' ', '_')
 
+        ds = rasterio.open(raster_fn)
+        ds_proj4 = ds.crs.to_proj4()
+
         loc_path = self.loc_path
         _d = self._d
 
@@ -187,11 +198,10 @@ class Location(object):
         sf_fn = os.path.abspath(sf_fn)
         sf = fiona.open(sf_fn, 'r')
 
-        ds = rasterio.open(raster_fn)
         data = ds.read(1, masked=True)
 
-        if 'biomass' in raster_fn:
-            data = np.ma.masked_values(data, 0)
+#        if 'biomass' in raster_fn:
+#            data = np.ma.masked_values(data, 0)
 
         _data = {}
         for feature in sf:
@@ -199,12 +209,16 @@ class Location(object):
             key = properties[sf_feature_properties_key].replace(' ', '_')
 
             _pasture, _ranch = key.split(self.key_delimiter)
+  
+            if ranch is not None:
+                if _ranch.lower() != ranch.lower():
+                    continue
 
-            if _ranch.lower() == ranch.lower():
-                pasture_mask, _, _ = raster_geometry_mask(ds, [feature['geometry']])
+            _features = transform_geom(sf.crs_wkt, ds_proj4, feature['geometry'])
+            pasture_mask, _, _ = raster_geometry_mask(ds, [_features])
 
-                x = data[np.logical_not(pasture_mask)]
-                _data[(_ranch, _pasture)] = [float(x) for x in x[x.mask == False]], int(np.sum(np.logical_not(pasture_mask)))
+            x = data[np.logical_not(pasture_mask)]
+            _data[(_ranch, _pasture)] = [float(x) for x in x[x.mask == False]], int(np.sum(np.logical_not(pasture_mask)))
 
         return _data
 
@@ -216,6 +230,8 @@ class Location(object):
         if pasture is not None:
             pasture = pasture.replace(' ', '_')
 
+        ds = rasterio.open(raster_fn)
+        ds_proj4 = ds.crs.to_proj4()
 
         target_ranch = ranch.replace(' ', '_').lower().strip()
         target_pasture = pasture.replace(' ', '_').lower().strip()
@@ -236,12 +252,12 @@ class Location(object):
             _pasture, _ranch = _key.split(self.key_delimiter)
 
             if _ranch.lower() == target_ranch and _pasture.lower() == target_pasture:
-                features.append(feature['geometry'])
+                _features = transform_geom(sf.crs_wkt, ds_proj4, feature['geometry'])
+                features.append(_features)
 
         if len(features) == 0:
             raise KeyError((ranch, pasture))
 
-        ds = rasterio.open(raster_fn)
         pasture_mask, _, _ = raster_geometry_mask(ds, features)
         indx = np.where(pasture_mask == False)
         return indx
@@ -259,6 +275,9 @@ class Location(object):
         assert _exists(_split(dst_fn)[0])
         assert dst_fn.endswith('.tif')
 
+        ds = rasterio.open(raster_fn)
+        ds_proj4 = ds.crs.to_proj4()
+
         loc_path = self.loc_path
         _d = self._d
 
@@ -275,11 +294,12 @@ class Location(object):
             _pasture, _ranch = key.split(self.key_delimiter)
 
             if any(_ranch.lower() == r.lower() for r in ranches):
-                features.append(feature['geometry'])
+                _features = transform_geom(sf.crs_wkt, ds_proj4, feature['geometry'])
+                features.append(_features)
 
+        utm_dst_fn = ''
         try:
             # true where valid
-            ds = rasterio.open(raster_fn)
             pasture_mask, _, _ = raster_geometry_mask(ds, features)
             data = np.ma.array(ds.read(1, masked=True), mask=pasture_mask)
 
@@ -309,6 +329,7 @@ class Location(object):
                 os.remove(utm_dst_fn)
             raise
 
+        dst_vrt_fn = ''
         try:
             dst_vrt_fn = dst_fn.replace('.tif', '.vrt')
 

@@ -162,7 +162,7 @@ if __name__ == "__main__":
     from api.app import RANGESAT_DIRS, Location
     import os
 
-    location = 'Zumwalt2'
+    location = 'JISA'
 
     _location = None
     for rangesat_dir in RANGESAT_DIRS:
@@ -181,7 +181,7 @@ if __name__ == "__main__":
         pastures = _ranch['pastures']
 
         for pasture in pastures:
-            #print(pasture, ranch)
+            print(pasture, ranch)
             _pasture = _location.serialized_pasture(ranch, pasture)
             ranch = ranch.replace("'", "~").replace(' ', '_')
             pasture = pasture.replace("'", "~").replace(' ', '_')

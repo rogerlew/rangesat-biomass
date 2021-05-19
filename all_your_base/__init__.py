@@ -65,17 +65,31 @@ def get_sf_wgs_bounds(_sf_fn):
 
 
 def bounds_intersect(a, b):
-    assert a[0] < a[2]
-    assert a[1] < a[3]
-    assert b[0] < b[2]
-    assert b[1] < b[3]
+     l_a, b_a, r_a, t_a = a
+     assert l_a < r_a
+     assert b_a < t_a
 
-    x1 = max(min(a[0], a[2]), min(b[0], b[2]))
-    y1 = max(min(a[1], a[3]), min(b[1], b[3]))
-    x2 = min(max(a[0], a[2]), max(b[0], b[2]))
-    y2 = min(max(a[1], a[3]), max(b[1], b[3]))
-    return x1 < x2 and y1 < y2
+     l_b, b_b, r_b, t_b = b
+     assert l_b < r_b
+     assert b_a < t_a
 
+     print(max(l_a, l_b), min(r_a, r_b), max(b_a, b_b), min(t_a, t_b))
+     return max(l_a, l_b) < min(r_a, r_b) and max(b_a, b_b) < min(t_a, t_b)
+
+
+def bounds_contain(a, b):
+     """
+     returns true if a is contained within b
+     """
+     l_a, b_a, r_a, t_a = a
+     assert l_a < r_a
+     assert b_a < t_a
+
+     l_b, b_b, r_b, t_b = b
+     assert l_b < r_b
+     assert b_a < t_a
+
+     return l_a >= l_b and b_a >= b_b and r_a <= r_b and t_a <= t_b
 
 def isfloat(f):
     # noinspection PyBroadException

@@ -104,10 +104,7 @@ def place_order(bbox,
     # Extract Landsat scene ids for each hit from the metadata
     _scene_list = [x['displayId'] for x in scene_list]
 
-#    if verbose:
-#        print(scene_list)
-
-    scene_list = []
+    orders = []
     for scene in _scene_list:
 
         if not scene.endswith('T1'):
@@ -135,32 +132,36 @@ def place_order(bbox,
             print('   date restricted.')
             continue
 
-        scene_list.append(scene)
+        products = espa.get_available_products(scene)
+        print(scene, products)
+        if landsat_num == 4 or landsat_num == 5:
+            try:
+                products = products['tm5_collection']['products']
+            except:
+                products = products['tm4_collection']['products']
+        elif landsat_num == 7:
+            products = products['etm7_collection']['products']
+        else:
+            if 'oli8_collection' in products:
+                products = products['oli8_collection']['products']
+            else:
+                products = products['olitirs8_collection']['products']
 
-    if len(scene_list) == 0:
-        return
+        # Place order (full scenes, no reprojection, sr and pixel_qa)
+       
+        print(scene, products)
+        if scene in ['LE07_L1TP_040029_20040302_20160927_01_T1',
+                     'LT05_L1TP_039030_19880408_20161002_01_T1']:
+            return
 
-    products = espa.get_available_products(scene_list[0])
-    if landsat_num == 4 or landsat_num == 5:
-        try:
-            products = products['tm5_collection']['products']
-        except:
-            products = products['tm4_collection']['products']
-    elif landsat_num == 7:
-        products = products['etm7_collection']['products']
-    else:
-        products = products['olitirs8_collection']['products']
+        order = espa.order(scene_list=[scene], products=products)  #, extent=bbox)
 
-#    if verbose:
-#        print(landsat_num, products)
+        if verbose:
+            print(order.orderid)
 
-    # Place order (full scenes, no reprojection, sr and pixel_qa)
-    order = espa.order(scene_list=scene_list, products=products)  #, extent=bbox)
+        orders.append(order)
 
-    if verbose:
-        print(order.orderid)
-
-    return order
+    return orders
 
 
 def build_catalog(directory):
@@ -188,7 +189,7 @@ if len(catalog) <= 0:
 
 current_year = datetime.now().year
 
-locations = ['Zumwalt']
+locations = ['Zumwalt2']
 pad = 0.2
 for location in locations:
     _location = None
@@ -205,9 +206,9 @@ for location in locations:
     e, n, w, s = bbox
     bbox = (e-pad, s-pad, w+pad, n+pad)
 #    bbox = -117.8270, 46.0027, -116.5416, 45.3048
-    y0 = 2019
-    yend = 2019
-    for landsat_num in [8, 7]:
+    y0 = 2020
+    yend = 2021
+    for landsat_num in [8]:
         for yr in range(y0, yend+1):
             place_order(bbox=bbox,
                         t0=datetime(yr, 1, 1),

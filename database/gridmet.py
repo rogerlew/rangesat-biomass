@@ -35,7 +35,7 @@ def mm_to_in(x):
     return x / 25.4
 
 
-def load_gridmet_single_year(directory, year, units='SI'):
+def load_gridmet_single_year(directory, year, units='SI', wy=False):
 
     d = {}
     for var in _variables:
@@ -62,6 +62,39 @@ def load_gridmet_single_year(directory, year, units='SI'):
         for var in ['pr', 'pet', 'pwd']:
             if d[var] is not None:
                 d[var] = [mm_to_in(v) for v in d[var]]
+
+    if wy:
+        dp = load_gridmet_single_year(directory, year-1, units=units)
+
+        if d['dates'] is not None:
+            for i, _date in enumerate(d['dates']):
+                year, month, day = [int(v) for v in _date.split('-')]
+                if month == 10 and day == 1:
+                    break
+
+            for var in d:
+                if d[var] is None:
+                    continue
+                d[var] = d[var][:i]
+
+        if dp['dates'] is not None:
+            for i, _date in enumerate(dp['dates']):
+                year, month, day = [int(v) for v in _date.split('-')]
+                if month == 10 and day == 1:
+                    break
+
+            for var in d:
+                if d[var] is None:
+                    if dp[var] is None:
+                        continue
+                    else:
+                        d[var] = dp[var][i:]
+                else:
+
+                    if dp[var] is None:
+                        continue
+                    else:
+                        d[var] = dp[var][i:] + d[var]
 
     return d
 
@@ -127,7 +160,7 @@ def load_gridmet_single_year_monthly(directory, year, units='SI'):
     return _d
 
 
-def load_gridmet_all_years(directory, start_year=None, end_year=None, units='SI'):
+def load_gridmet_all_years(directory, start_year=None, end_year=None, units='SI', wy=False):
     if start_year is None:
         start_year = 1979
     if end_year is None:
@@ -138,7 +171,7 @@ def load_gridmet_all_years(directory, start_year=None, end_year=None, units='SI'
 
     d = {}
     for year in range(start_year, end_year + 1):
-        d[year] = load_gridmet_single_year(directory, year, units)
+        d[year] = load_gridmet_single_year(directory, year, units, wy)
 
     return d
 

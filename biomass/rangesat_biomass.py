@@ -13,6 +13,8 @@ import warnings
 import rasterio
 from rasterio.mask import raster_geometry_mask
 
+from fiona.transform import transform_geom
+
 import numpy as np
 from .landsat import LandSatScene
 
@@ -44,6 +46,7 @@ class SatModelPars(object):
         self.required_coverage = required_coverage
         self.minimum_area_ha = minimum_area_ha
         self.log_transformed_estimate = log_transformed_estimate
+
 
 class ModelPars(object):
     def __init__(self, name, sat_pars):
@@ -86,7 +89,7 @@ class ModelStat(object):
 
 
 class BiomassModel(object):
-    def __init__(self, ls: LandSatScene, models: ModelPars, verbose=False):
+    def __init__(self, ls: LandSatScene, models: ModelPars, verbose=True):
 
         sat = ls.satellite
 
@@ -118,20 +121,38 @@ class BiomassModel(object):
         biomass = {}
 
         for m in models:
-            summer_mask[m.name] = ls.threshold(m[sat].discriminate_index, m[sat].discriminate_threshold, qa_mask)
+            has_threshold = str(m[sat].discriminate_index).lower().startswith('none')
+
+            if has_threshold:
+                summer_mask[m.name] = ls.threshold(m[sat].discriminate_index, m[sat].discriminate_threshold, qa_mask)
+            else:
+                summer_mask[m.name] = not_qa_mask
 
             summer_index = np.ma.array(ls.get_index(m[sat].summer_index), mask=qa_mask)
-            summer_vi[m.name] = summer_mask[m.name] * np.clip(m[sat].summer_int + m[sat].summer_slp * summer_index,
-                                                              a_min=0, a_max=None)
+            if m[sat].summer_slp < 0 and m[sat].summer_int == 0:
+                a_min = None
+            else:
+                a_min = 0.0
+            summer_vi[m.name] = summer_mask[m.name] * m[sat].summer_int + m[sat].summer_slp * summer_index
+            if a_min is not None:
+                summer_vi[m.name] = np.clip(summer_vi[m.name], a_min=a_min, a_max=None)
 
             if m[sat].log_transformed_estimate:
                 summer_vi[m.name] = np.exp(summer_vi[m.name])
 
-            # fall is based on NBR2. It is applied when PSRI is less than or equal to the psri_threshold
-            fall_mask[m.name] = np.logical_not(summer_mask[m.name])
+            if has_threshold:
+                fall_mask[m.name] = np.logical_not(summer_mask[m.name])
+            else:
+                fall_mask[m.name] = not_qa_mask
+
             fall_index = np.ma.array(ls.get_index(m[sat].fall_index), mask=qa_mask)
-            fall_vi[m.name] = fall_mask[m.name] * np.clip(m[sat].fall_int + m[sat].fall_slp * fall_index,
-                                                          a_min=0, a_max=None)
+            if m[sat].fall_slp < 0 and m[sat].fall_int == 0:
+                a_min = None
+            else:
+                a_min = 0.0
+            fall_vi[m.name] = fall_mask[m.name] * m[sat].fall_int + m[sat].fall_slp * fall_index
+            if a_min is not None:
+                fall_vi[m.name] = np.clip(fall_vi[m.name], a_min=a_min, a_max=None)
 
             if m[sat].log_transformed_estimate:
                 fall_vi[m.name] = np.exp(fall_vi[m.name])
@@ -140,10 +161,17 @@ class BiomassModel(object):
             biomass[m.name] = summer_vi[m.name] + fall_vi[m.name]
 
             if verbose:
+                print('summer')
+                print(m[sat].summer_index)
+                print(m[sat].summer_int)
+                print(m[sat].summer_slp)
                 print('summer_index', np.mean(summer_index))
                 print('summer_vi[m.name]', np.mean(summer_vi[m.name]))
-                print('summer_index', np.mean(summer_index))
+                print(m[sat].fall_index)
+                print(m[sat].fall_int)
+                print(m[sat].fall_slp)
                 print('fall_index', np.mean(fall_index))
+                print('fall_vi[m.name]', np.mean(fall_vi[m.name]))
                 print('biomass[m.name]', np.mean(biomass[m.name]))
 
         self.ls = ls
@@ -191,13 +219,20 @@ class BiomassModel(object):
             data = np.array(np.round(data), dtype=dtype)
             ls.dump(data, _join(biomass_dir, '%s_summer_vi.tif' % name), dtype=dtype)
 
-    def analyze_pastures(self, sf, sf_feature_properties_key):
+        ls_dir = _join(os.path.abspath(biomass_dir), os.path.pardir)
+        data = np.array(np.round(self.ndvi), dtype=dtype)
+        ls.dump(data, _join(ls_dir, '%s_ndvi.tif' % ls.product_id), dtype=dtype)
+
+
+    def analyze_pastures(self, sf, sf_feature_properties_key, sf_feature_properties_delimiter='+'):
         """
         Iterate over each pasture and determine the biomass, etc. for each model
 
         :param sf:
         :return:
         """
+        
+
         ls = self.ls
         sat = self.ls.satellite
         cellsize = ls.cellsize
@@ -215,7 +250,7 @@ class BiomassModel(object):
         valid_pastures_cnt = 0
         for feature in sf:
             key = feature['properties'][sf_feature_properties_key]
-            features = [feature['geometry']]
+            features = [transform_geom(sf.crs_wkt, ls.proj4, feature['geometry'])]
 
             # true where valid
             pasture_mask, _, _ = raster_geometry_mask(ls.template_ds, features)
@@ -242,13 +277,14 @@ class BiomassModel(object):
 
             area_ha = total_px * cellsize * cellsize * 0.0001
 
-            pasture, ranch = key.split('+')
+            pasture, ranch = key.split(sf_feature_properties_delimiter)
             if pasture in 'ABCDEFGHIJKLMNO':
                 area_ha = 2.0
                 coverage = 1.0
 
             model_stats = {}  # dictionary of dictionaries for each model
             for m in models:
+                print(m.name)
                 m_sat = m[sat]
 
                 d = ModelStat(model=m.name)

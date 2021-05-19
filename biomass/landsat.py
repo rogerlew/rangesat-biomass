@@ -115,18 +115,20 @@ class LandSatScene(object):
 
         product_id = None
         for member in tar.getnames():
-            if member.endswith('.tif'):
+            if member.lower().endswith('.tif'):
                 product_id = '_'.join(_split(member)[-1].split('_')[:7])
                 break
 
         d = {}
         for member in tar.getnames():
             key = _split(member)[-1].replace('%s_' % product_id, '')\
-                                    .replace('.tif', '')
+                                    .replace('.tif', '').replace('.TIF', '')
 
-            if member.endswith('.xml'):
+            if member.lower().endswith('.xml'):
                 d['.xml'] = tar.extractfile(member).read()
-            elif member.endswith('.tif'):
+            if member.lower().endswith('.txt') and 'MTL' in member:
+                d['.mtl'] = tar.extractfile(member).read()
+            elif member.lower().endswith('.tif'):
                 d[key] = member
 
         self.tar = tar
@@ -196,6 +198,11 @@ class LandSatScene(object):
         src = self._d['pixel_qa']
         bounds = src.bounds
         return [bounds.left, bounds.bottom, bounds.right, bounds.top]
+
+    @property
+    def proj4(self):
+        src = self._d['pixel_qa']
+        return src.crs.to_proj4()
 
     @property
     def wgs_bounds(self):
@@ -644,6 +651,11 @@ class LandSatScene(object):
         returns mask where 1 if index is greater than threshold
         and 0 if less or equal to threshold
         """
+        if indexname is  None:
+            _mask = np.zeros(self.aerosol.shape, dtype=np.uint8)
+            _mask[mask == 0] = 1
+            return _mask
+
         assert threshold >= -1.0
         assert threshold <= 1.0
 
@@ -652,9 +664,9 @@ class LandSatScene(object):
         if mask is not None:
             data = np.ma.array(data, mask=mask)
 
-        mask = np.zeros(data.shape, dtype=np.uint8)
-        mask[np.where(data > threshold)] = 1
-        return mask
+        _mask = np.zeros(data.shape, dtype=np.uint8)
+        _mask[np.where(data > threshold)] = 1
+        return _mask
 
     @property
     def evi(self):

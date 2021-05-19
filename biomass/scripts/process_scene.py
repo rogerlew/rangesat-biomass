@@ -11,6 +11,8 @@ import tarfile
 from glob import glob
 from time import time
 
+from pathlib import Path
+
 from os.path import join as _join
 from os.path import exists as _exists
 from os.path import split as _split
@@ -23,7 +25,7 @@ sys.path.insert(0, '/Users/roger/rangesat-biomass')
 
 from biomass.landsat import LandSatScene, get_gz_scene_bounds
 from biomass.rangesat_biomass import ModelPars, SatModelPars, BiomassModel
-from all_your_base import get_sf_wgs_bounds, bounds_intersect, SCRATCH
+from all_your_base import get_sf_wgs_bounds, bounds_intersect, bounds_contain, SCRATCH
 
 
 def extract(tar_fn, dst):
@@ -39,7 +41,7 @@ def extract(tar_fn, dst):
 
 
 def process_scene(scn_fn, verbose=True):
-    global models, out_dir, sf, bbox, sf_feature_properties_key
+    global models, out_dir, sf, bbox, sf_feature_properties_key, sf_feature_properties_delimiter
 
     assert '.tar.gz' in scn_fn
     if verbose:
@@ -62,6 +64,7 @@ def process_scene(scn_fn, verbose=True):
         ls = None
         _ls = None
         shutil.rmtree(scn_path)
+        Path(_join(out_dir, '.{}'.format(_split(scn_path)[-1]))).touch()
         raise
 
     _ls.dump_rgb(_join(ls.basedir, 'rgb.tif'), gamma=1.5)
@@ -76,7 +79,7 @@ def process_scene(scn_fn, verbose=True):
 
     # Analyze pastures
     print('analyzing pastures')
-    res = bio_model.analyze_pastures(sf, sf_feature_properties_key)
+    res = bio_model.analyze_pastures(sf, sf_feature_properties_key, sf_feature_properties_delimiter)
 
     # get a summary dictionary of the landsat scene
     print('compiling summary')
@@ -200,14 +203,16 @@ if __name__ == '__main__':
     wrs_blacklist = _d.get('wrs_blacklist', None)
 
     sf_feature_properties_key = _d.get('sf_feature_properties_key', 'key')
+    sf_feature_properties_delimiter = _d.get('sf_feature_properties_delimiter', '+')
 
     out_dir = _d['out_dir']
 
     scene_fn = sys.argv[-1]
 
     scn_bounds = get_gz_scene_bounds(scene_fn)
-    if not bounds_intersect(bbox, scn_bounds):
-        print('bounds do not intersect')
+    if not bounds_contain(bbox, scn_bounds):
+        print('bounds do not intersect', bbox, scn_bounds)
+        Path(_join(out_dir, '.{}'.format(_split(scene_fn.replace('.tar.gz', ''))[-1]))).touch()
         sys.exit()
 
     res = process_scene(scene_fn)
@@ -215,3 +220,4 @@ if __name__ == '__main__':
     prefix = os.path.basename(os.path.normpath(scene_fn)).replace('.tar.gz', '')
 
     dump_pasture_stats([res], _join(out_dir, '%s_pasture_stats.csv' % prefix))
+

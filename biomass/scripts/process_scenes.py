@@ -10,6 +10,7 @@ import tarfile
 from glob import glob
 from time import time
 
+import os
 from os.path import join as _join
 from os.path import exists as _exists
 from os.path import split as _split
@@ -17,7 +18,8 @@ from os.path import split as _split
 import fiona
 import rasterio
 
-sys.path.append(os.path.abspath('../../'))
+_this_dir = os.path.dirname(__file__)
+sys.path.append(os.path.abspath(_join(_this_dir , '../../')))
 
 from biomass.landsat import LandSatScene
 from biomass.rangesat_biomass import ModelPars, SatModelPars, BiomassModel
@@ -47,7 +49,7 @@ def is_processed(fn):
     _fn = _split(fn)[-1].split('-')[0]
     res = glob(_join(out_dir, '{}_*_{}_{}_*_{}_{}'
                .format(_fn[:4], _fn[4:10], _fn[10:18], _fn[18:20], _fn[20:22])))
-    return len(res) > 0
+    return len(res) > 0 or _exists(_join(out_dir, '.{}'.format(_split(fn.replace('.tar.gz', ''))[-1])))
 
 #
 # INITIALIZE GLOBAL VARIABLES
@@ -100,7 +102,9 @@ if __name__ == '__main__':
     # find all the scenes
     fns = glob(_join(landsat_scene_directory, '*.tar.gz'))
 
-    if wrs_blacklist is not None:
+    print(landsat_scene_directory, fns)
+
+    if wrs_blacklist:
         _fns = []
         for fn in fns:
             if _split(fn)[-1][4:10] in wrs_blacklist:
@@ -109,7 +113,7 @@ if __name__ == '__main__':
 
         fns = _fns
 
-    if wrs_whitelist is not None:
+    if wrs_whitelist:
         _fns = []
         for fn in fns:
             if _split(fn)[-1][4:10] in wrs_whitelist:
@@ -117,11 +121,12 @@ if __name__ == '__main__':
 
         fns = _fns
 
-    fns = [fn for fn in fns if not is_processed(fn)]
+#    fns = [fn for fn in fns if not is_processed(fn)]
 
+    fns = [fn for fn in fns if not _exists(_join(out_dir, '.' +  _split(fn)[-1].replace('.tar.gz', '')))]
 #    random.shuffle(fns)
 
-    if years is not None:
+    if years:
         _fns = []
         for fn in fns:
             if int(_split(fn)[-1][10:14]) in years:

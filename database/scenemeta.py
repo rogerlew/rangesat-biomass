@@ -16,6 +16,7 @@ from .location import Location
 
 import sqlite3
 
+
 def _scene_wrs_filter(fns, rowpath):
     return [fn for fn in fns if fn.split('_')[2] in rowpath]
 

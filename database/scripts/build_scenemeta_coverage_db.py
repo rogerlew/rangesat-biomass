@@ -13,17 +13,27 @@ import multiprocessing
 
 sys.path.insert(0, '/var/www/rangesat-biomass')
 from database.pasturestats import query_scene_product_ids
+from api.app import RANGESAT_DIRS, Location
+from all_your_base import isfloat
 
+location = sys.argv[-1]
+
+_location = None
+for rangesat_dir in RANGESAT_DIRS:
+    loc_path = _join(rangesat_dir, location)
+    if exists(loc_path):
+        _location = Location(loc_path)
+        break
+
+assert _location is not None
+
+out_dir = _location.out_dir
+key_delimiter = _location.key_delimiter
+
+db_fn = _join(out_dir, 'sqlite3.db')
+cov_db_fn = _join(out_dir, 'scenemeta_coverage.db')
 
 NCPU = multiprocessing.cpu_count() - 1
-
-# db_fn = '/space/rangesat/Zumwalt/sqlite3.db'
-# db_fn = '/var/www/rangesat-biomass/sites/SageSteppe/rcr_sqlite3.db'
-db_fn = '/space/rangesat/db/Zumwalt2/sqlite3.db'
-
-# cov_db_fn = '/space/rangesat/Zumwalt/scenemeta_coverage.db'
-# cov_db_fn = '/var/www/rangesat-biomass/sites/SageSteppe/rcr_scenemeta_coverage.db'
-cov_db_fn = '/space/rangesat/db/Zumwalt2/scenemeta_coverage.db'
 
 conn = sqlite3.connect(db_fn)
 c = conn.cursor()

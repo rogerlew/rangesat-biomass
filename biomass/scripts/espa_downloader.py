@@ -307,8 +307,31 @@ def main(username, email, order, target_directory, password=None, host=None, ver
                 scene = Scene(scenes[s])
                 storage.store(scene, checksum, retry)
 
+def build_catalog(directory):
+    fns = glob(_join(directory, '*.gz'))
+
+    catalog = []
+    for fn in fns:
+        product_id = _split(fn)[-1].split('-')[0]
+
+        satellite = int(product_id[2:4])
+        wrs_path = int(product_id[4:7])
+        wrs_row = int(product_id[7:10])
+
+        _date = product_id[10:18]
+        year, month, day = int(_date[:4]), int(_date[4:6]), int(_date[6:])
+        catalog.append(tuple([satellite, wrs_path, wrs_row, year, month, day]))
+
+    return catalog
+
+
+landsat_data_dir = "/geodata/torch-landsat"
+catalog = build_catalog(landsat_data_dir)
+
+print(catalog[:100])
 
 if __name__ == '__main__':
+    sys.exit()
     epilog = ('ESPA Bulk Download Client Version 1.0.0. [Tested with Python 2.7]\n'
               'Retrieves all completed scenes for the user/order\n'
               'and places them into the target directory.\n'
