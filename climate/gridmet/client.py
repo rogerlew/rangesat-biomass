@@ -162,7 +162,7 @@ if __name__ == "__main__":
     from api.app import RANGESAT_DIRS, Location
     import os
 
-    location = 'JISA'
+    location = 'RCR'
 
     _location = None
     for rangesat_dir in RANGESAT_DIRS:
