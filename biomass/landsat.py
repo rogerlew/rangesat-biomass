@@ -34,7 +34,7 @@ def get_gz_scene_bounds(fn):
 
     member = tf.next()
 
-    while not member.name.endswith('.tif'):
+    while not member.name.lower().endswith('.tif'):
         member = tf.next()
 
     data = io.BytesIO(tf.extractfile(member).read())
@@ -73,24 +73,33 @@ class LandSatScene(object):
         fns = glob(_join(fn, '*.xml'))
 
         assert len(fns) == 1, fns
-        product_id = _split(fns[0])[-1][:-4]
+        product_id = _split(fns[0])[-1][:-4].replace('_MTL', '')
 
         if product_id.endswith('_'):
             product_id = product_id[:-1]
 
-        print('product_id', product_id)
-
         d = {}
         for fn in glob(_join(fn, '*')):
-            key = _split(fn)[-1].replace('%s_' % product_id, '')\
-                                .replace('.tif', '')
-
-            if fn.endswith('.xml'):
+            key = _split(fn)[-1].replace('%s_' % product_id, '') \
+                                .lower() \
+                                .replace('.tif', '') \
+                                .replace('qa_pixel', 'pixel_qa') \
+                                .replace('sr_b1', 'sr_band1') \
+                                .replace('sr_b2', 'sr_band2') \
+                                .replace('sr_b3', 'sr_band3') \
+                                .replace('sr_b4', 'sr_band4') \
+                                .replace('sr_b5', 'sr_band5') \
+                                .replace('sr_b6', 'sr_band6') \
+                                .replace('sr_b7', 'sr_band7') \
+                               
+            if fn.lower().endswith('.xml'):
                 with open(fn, 'r') as fp:
                     d['.xml'] = fp.read()
 
-            elif fn.endswith('.tif'):
+            elif fn.lower().endswith('.tif'):
                 d[key] = rasterio.open(fn)
+
+            print(key)
 
         self.product_id = product_id
         self.fn = fn
@@ -130,6 +139,8 @@ class LandSatScene(object):
                 d['.mtl'] = tar.extractfile(member).read()
             elif member.lower().endswith('.tif'):
                 d[key] = member
+
+            print(key)
 
         self.tar = tar
         self.product_id = product_id
@@ -374,11 +385,12 @@ class LandSatScene(object):
 
     @property
     def tasseled_cap_greenness(self):
+        # https://gis.stackexchange.com/questions/156161/tasseled-cap-transformation-coefficient-and-bias-value/156255#156255
         if self.satellite == 8:
             return self._tasseled_cap_greenness__8()
-        if self.satellite == 5:
-            return self._tasseled_cap_greenness__7()
         if self.satellite == 7:
+            return self._tasseled_cap_greenness__7()
+        if self.satellite == 5:
             return self._tasseled_cap_greenness__5()
 
     def _tasseled_cap_brightness__5(self):
@@ -407,6 +419,7 @@ class LandSatScene(object):
 
     @property
     def tasseled_cap_brightness(self):
+        # https://gis.stackexchange.com/questions/156161/tasseled-cap-transformation-coefficient-and-bias-value/156255#156255
         if self.satellite == 8:
             return self._tasseled_cap_brightness__8()
         if self.satellite == 7:
@@ -440,6 +453,7 @@ class LandSatScene(object):
 
     @property
     def tasseled_cap_wetness(self):
+        # https://gis.stackexchange.com/questions/156161/tasseled-cap-transformation-coefficient-and-bias-value/156255#156255
         if self.satellite == 8:
             return self._tasseled_cap_wetness__8()
         if self.satellite == 7:
