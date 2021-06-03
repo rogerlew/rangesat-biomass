@@ -5,10 +5,40 @@ from os.path import split as _split
 
 from glob import glob
 
+from subprocess import Popen
+
 import numpy as np
 import rasterio
 from rasterio.mask import raster_geometry_mask
 import warnings
+
+from osgeo import gdal
+
+
+def transform_to_template_ds(template_fn, src_fn, dst_fn):
+    ds = gdal.Open(template_fn)
+
+    transform = ds.GetGeoTransform()
+    ul_x, ul_y = transform[0], transform[3]
+    xres, yres = transform[1], transform[5]
+    wkt = ds.GetProjection()
+    x, y = ds.RasterXSize, ds.RasterYSize
+    lr_x, lr_y = ul_x + x * xres, ul_y + y * yres
+
+    xmin, ymin, xmax, ymax = ul_x, lr_y, lr_x, ul_y
+
+    assert xmax > xmin
+    assert ymax > ymin
+
+    if _exists(dst_fn):
+        os.remove(dst_fn)
+
+    cmd = ['gdalwarp', '-ts', x, y, '-te', xmin, ymin, xmax, ymax, '-t_srs', wkt, src_fn, dst_fn]
+    cmd = [str(v) for v in cmd]
+    p = Popen(cmd)
+    p.wait()
+
+    assert _exists(dst_fn)
 
 
 def make_raster_difference(scn_fn1, scn_fn2, dst_fn, nodata=-9999.0):
@@ -27,7 +57,10 @@ def make_raster_difference(scn_fn1, scn_fn2, dst_fn, nodata=-9999.0):
     _data2 = np.ma.masked_values(_data2, 0)
     _data2 = np.ma.masked_values(_data2, 1)
 
-    assert _data1.shape == _data2.shape
+    if not _data1.shape == _data2.shape:
+        transformed_scn_fn2 = scn_fn2[:-4] + '.x.tif'
+        transform_to_template_ds(scn_fn1, scn_fn2, transformed_scn_fn2)
+        return make_raster_difference(scn_fn1, transformed_scn_fn2, dst_fn, nodata)
 
     data = (_data2[0, :, :] - _data1[0, :, :]) / _data1[0, :, :]
 
@@ -54,8 +87,6 @@ def make_aggregated_rasters(scn_fns, dst_fn, agg_func=np.max, nodata=-9999.0):
     for scn_fn in scn_fns:
         ds = rasterio.open(scn_fn)
         stack.append(ds.read())
-
-        print(scn_fn, stack[-1].shape)
 
     stack = np.concatenate(stack)
     data = agg_func(stack, axis=0)
