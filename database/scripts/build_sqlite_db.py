@@ -233,14 +233,14 @@ for location in locations:
                         fall_vi_mean_gpm = 'null'
                         fraction_summer = 'null'
 
-                pasture, ranch = key.replace('Tripple', 'Triple').split(key_delimiter)
+                key = key.replace('Tripple', 'Triple').replace('-RCR', '+RCR')
+                pasture, ranch = key.split(key_delimiter)
                 _date = product_id.split('_')[3]
                 acquisition_date = date(int(_date[:4]), int(_date[4:6]), int(_date[6:]))
                
                 if reverse_pasture_ranch_key:
                     ranch, pasture = pasture, ranch
                     key = '{}{}{}'.format(pasture, key_delimiter, ranch)
-                    print(ranch, pasture, key) 
 
                 # Insert a row of data
                 query = """INSERT INTO pasture_stats VALUES ("{product_id}","{key}","{pasture}","{ranch}",\
