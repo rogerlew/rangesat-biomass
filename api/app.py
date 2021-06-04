@@ -1006,6 +1006,20 @@ def pasturestats(location):
         return exception_factory()
 
 
+def sp_min(x):
+    try:
+        return np.min(x)
+    except:
+        return np.nan
+
+
+def sp_max(x):
+    try:
+        return np.max(x)
+    except:
+        return np.nan
+
+
 def _get_agg_func(agg_func):
     if agg_func not in ['mean', 'median', 'sum', 'count', 'max', 'min', 'std']:
         return None
@@ -1019,9 +1033,9 @@ def _get_agg_func(agg_func):
     elif agg_func == 'count':
         agg_func = len
     elif agg_func == 'max':
-        agg_func = np.max
+        agg_func = sp_max
     elif agg_func == 'min':
-        agg_func = np.min
+        agg_func = sp_min
     elif agg_func == 'std':
         agg_func = np.std
 
