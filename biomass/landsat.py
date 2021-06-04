@@ -99,8 +99,6 @@ class LandSatScene(object):
             elif fn.lower().endswith('.tif'):
                 d[key] = rasterio.open(fn)
 
-            print(key)
-
         self.product_id = product_id
         self.fn = fn
         self._d = d
@@ -139,8 +137,6 @@ class LandSatScene(object):
                 d['.mtl'] = tar.extractfile(member).read()
             elif member.lower().endswith('.tif'):
                 d[key] = member
-
-            print(key)
 
         self.tar = tar
         self.product_id = product_id

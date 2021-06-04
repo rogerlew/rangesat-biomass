@@ -33,6 +33,12 @@ import hashlib
 import logging
 from getpass import getpass
 
+from os.path import join as _join
+from os.path import exists as _exists
+from os.path import split as _split
+
+from glob import glob
+
 if sys.version_info[0] == 3:
     import urllib.request as ul
 else:
@@ -314,11 +320,18 @@ def build_catalog(directory):
     for fn in fns:
         product_id = _split(fn)[-1].split('-')[0]
 
-        satellite = int(product_id[2:4])
-        wrs_path = int(product_id[4:7])
-        wrs_row = int(product_id[7:10])
+        if '_' not in product_id:
+            satellite = int(product_id[2:4])
+            wrs_path = int(product_id[4:7])
+            wrs_row = int(product_id[7:10])
+            _date = product_id[10:18]
+        else:
+            satellite = int(product_id[2:4])
+            wrs = product_id.split('_')[2]
+            wrs_path = int(wrs[:3])
+            wrs_row = int(wrs[3:])
+            _date = product_id.split('_')[3]
 
-        _date = product_id[10:18]
         year, month, day = int(_date[:4]), int(_date[4:6]), int(_date[6:])
         catalog.append(tuple([satellite, wrs_path, wrs_row, year, month, day]))
 
@@ -327,8 +340,6 @@ def build_catalog(directory):
 
 landsat_data_dir = "/geodata/torch-landsat"
 catalog = build_catalog(landsat_data_dir)
-
-print(catalog[:100])
 
 if __name__ == '__main__':
     sys.exit()

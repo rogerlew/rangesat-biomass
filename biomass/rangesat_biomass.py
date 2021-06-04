@@ -89,7 +89,7 @@ class ModelStat(object):
 
 
 class BiomassModel(object):
-    def __init__(self, ls: LandSatScene, models: ModelPars, verbose=True):
+    def __init__(self, ls: LandSatScene, models: ModelPars, verbose=False):
 
         sat = ls.satellite
 
@@ -121,8 +121,7 @@ class BiomassModel(object):
         biomass = {}
 
         for m in models:
-            has_threshold = str(m[sat].discriminate_index).lower().startswith('none')
-
+            has_threshold = not str(m[sat].discriminate_index).lower().startswith('none')
             if has_threshold:
                 summer_mask[m.name] = ls.threshold(m[sat].discriminate_index, m[sat].discriminate_threshold, qa_mask)
             else:
@@ -133,7 +132,7 @@ class BiomassModel(object):
                 a_min = None
             else:
                 a_min = 0.0
-            summer_vi[m.name] = summer_mask[m.name] * m[sat].summer_int + m[sat].summer_slp * summer_index
+            summer_vi[m.name] = summer_mask[m.name] * (m[sat].summer_int + m[sat].summer_slp * summer_index)
             if a_min is not None:
                 summer_vi[m.name] = np.clip(summer_vi[m.name], a_min=a_min, a_max=None)
 
@@ -150,7 +149,7 @@ class BiomassModel(object):
                 a_min = None
             else:
                 a_min = 0.0
-            fall_vi[m.name] = fall_mask[m.name] * m[sat].fall_int + m[sat].fall_slp * fall_index
+            fall_vi[m.name] = fall_mask[m.name] * (m[sat].fall_int + m[sat].fall_slp * fall_index)
             if a_min is not None:
                 fall_vi[m.name] = np.clip(fall_vi[m.name], a_min=a_min, a_max=None)
 
@@ -284,13 +283,11 @@ class BiomassModel(object):
 
             model_stats = {}  # dictionary of dictionaries for each model
             for m in models:
-                print(m.name)
                 m_sat = m[sat]
 
                 d = ModelStat(model=m.name)
 
                 if coverage > m_sat.required_coverage and area_ha > m_sat.minimum_area_ha:
-                    print(pasture)
 
                     # get masked array of the biomass
                     pasture_biomass = np.ma.array(biomass[m.name], mask=pasture_mask)
