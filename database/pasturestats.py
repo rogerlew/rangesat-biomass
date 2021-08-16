@@ -637,9 +637,20 @@ def query_multiyear_pasture_stats(db_fn, ranch=None, pasture=None, start_year=No
         if not any(mask):
             continue
 
-        _rows = [dict(zip(_header, row)) for m, row in zip(mask, rows) if m]
-        _rows = [d for d in _rows if d['biomass_mean_gpm'] is not None]
-
+        __rows = [dict(zip(_header, row)) for m, row in zip(mask, rows) if m]
+        _rows = []
+        for d in __rows:
+            if d['biomass_mean_gpm'] is None:
+                continue
+                
+            if d['biomass_mean_gpm'] == 0.0:
+                continue
+                
+            if d['coverage'] < 0.5:
+                continue
+                
+            _rows.append(d)
+       
         d = {key: [] for key in keys}
         for row in _rows:
             d[row['key']].append(row)
