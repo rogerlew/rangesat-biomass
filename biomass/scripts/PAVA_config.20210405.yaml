@@ -59,6 +59,6 @@ landsat_scene_directory: /geodata/torch-landsat
 # path rows that should be skipped
 wrs_blacklist: []
 
-wrs_whitelist: []
+wrs_whitelist: ['040029']
 
 years: []

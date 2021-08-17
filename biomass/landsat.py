@@ -381,81 +381,30 @@ class LandSatScene(object):
 
     @property
     def tasseled_cap_greenness(self):
-        # https://gis.stackexchange.com/questions/156161/tasseled-cap-transformation-coefficient-and-bias-value/156255#156255
-        if self.satellite == 8:
-            return self._tasseled_cap_greenness__8()
-        if self.satellite == 7:
-            return self._tasseled_cap_greenness__7()
-        if self.satellite == 5:
-            return self._tasseled_cap_greenness__5()
-
-    def _tasseled_cap_brightness__5(self):
-        return 0.2043 * self._band_proc('sr_band1') + \
-               0.4158 * self._band_proc('sr_band2') + \
-               0.5524 * self._band_proc('sr_band3') + \
-               0.5741 * self._band_proc('sr_band4') + \
-               0.3124 * self._band_proc('sr_band5') + \
-               0.2303 * self._band_proc('sr_band7')
-
-    def _tasseled_cap_brightness__7(self):
-        return 0.3561 * self._band_proc('sr_band1') + \
-               0.3972 * self._band_proc('sr_band2') + \
-               0.3904 * self._band_proc('sr_band3') + \
-               0.6966 * self._band_proc('sr_band4') + \
-               0.2286 * self._band_proc('sr_band5') + \
-               0.1596 * self._band_proc('sr_band7')
-
-    def _tasseled_cap_brightness__8(self):
-        return 0.3029 * self._band_proc('sr_band2') + \
-               0.2786 * self._band_proc('sr_band3') + \
-               0.4733 * self._band_proc('sr_band4') + \
-               0.5599 * self._band_proc('sr_band5') + \
-               0.5080 * self._band_proc('sr_band6') + \
-               0.1872 * self._band_proc('sr_band7')
+        return -0.2941 * self.blue + \
+               -0.2430 * self.green + \
+               -0.5424 * self.red + \
+                0.7276 * self.nir + \
+                0.0713 * self.swir1 + \
+               -0.1608 * self.swir2
 
     @property
     def tasseled_cap_brightness(self):
-        # https://gis.stackexchange.com/questions/156161/tasseled-cap-transformation-coefficient-and-bias-value/156255#156255
-        if self.satellite == 8:
-            return self._tasseled_cap_brightness__8()
-        if self.satellite == 7:
-            return self._tasseled_cap_brightness__7()
-        if self.satellite == 5:
-            return self._tasseled_cap_brightness__5()
-
-    def _tasseled_cap_wetness__5(self):
-        return +0.0315 * self._band_proc('sr_band1') + \
-                0.2021 * self._band_proc('sr_band2') + \
-                0.3102 * self._band_proc('sr_band3') + \
-                0.1594 * self._band_proc('sr_band4') + \
-               -0.6806 * self._band_proc('sr_band5') + \
-               -0.6109 * self._band_proc('sr_band7')
-
-    def _tasseled_cap_wetness__7(self):
-        return +0.2626 * self._band_proc('sr_band1') + \
-                0.2141 * self._band_proc('sr_band2') + \
-                0.0926 * self._band_proc('sr_band3') + \
-                0.0656 * self._band_proc('sr_band4') + \
-               -0.7629 * self._band_proc('sr_band5') + \
-               -0.5388 * self._band_proc('sr_band7')
-
-    def _tasseled_cap_wetness__8(self):
-        return +0.1511 * self._band_proc('sr_band2') + \
-                0.1973 * self._band_proc('sr_band3') + \
-                0.3283 * self._band_proc('sr_band4') + \
-                0.3407 * self._band_proc('sr_band5') + \
-               -0.7117 * self._band_proc('sr_band6') + \
-               -0.4559 * self._band_proc('sr_band7')
+        return 0.3029 * self.blue + \
+               0.2786 * self.green + \
+               0.4733 * self.red + \
+               0.5599 * self.nir + \
+               0.5080 * self.swir1 + \
+               0.1872 * self.swir2
 
     @property
     def tasseled_cap_wetness(self):
-        # https://gis.stackexchange.com/questions/156161/tasseled-cap-transformation-coefficient-and-bias-value/156255#156255
-        if self.satellite == 8:
-            return self._tasseled_cap_wetness__8()
-        if self.satellite == 7:
-            return self._tasseled_cap_wetness__7()
-        if self.satellite == 5:
-            return self._tasseled_cap_wetness__5()
+        return +0.1511 * self.blue + \
+                0.1973 * self.green + \
+                0.3283 * self.red + \
+                0.3407 * self.nir + \
+               -0.7117 * self.swir1 + \
+               -0.4559 * self.swir2
 
     @property
     def ultra_blue(self):
@@ -479,7 +428,6 @@ class LandSatScene(object):
             return 0.0088 + 0.8483 * self._band_proc('sr_band2')
         else:
             return -0.0016 + 0.9542 * self._band_proc('sr_band2')
-
 
     @property
     def red(self):

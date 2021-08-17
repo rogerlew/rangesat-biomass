@@ -35,7 +35,8 @@ GEODATA = GEODATA_DIRS[0]
 def process_scene(scn_fn):
     p = subprocess.Popen(['python3', 'process_scene.py', cfg_fn, scn_fn],
                          stderr=subprocess.PIPE, stdout=subprocess.PIPE)
-    p.wait()
+    ret = p.communicate()
+    print(ret)
 
     scn_path = scn_fn.replace('.tar.gz', '')
     if _exists(SCRATCH):

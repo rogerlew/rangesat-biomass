@@ -23,11 +23,7 @@ import requests
 
 logging.getLogger("urllib3").setLevel(logging.WARNING)
 
-def get_version():
-    with open("version.txt") as f:
-        return f.read().strip()
-
-version = get_version() 
+version = '3.0.0'
 LOGGER = logging.getLogger(__name__)
 USERAGENT = ('EspaBulkDownloader/{v} ({s}) Python/{p}'
              .format(v=version, s=platform.platform(aliased=True),

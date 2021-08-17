@@ -116,48 +116,45 @@ class BiomassModel(object):
         #
         summer_mask = {}
         summer_vi = {}
-        fall_mask = {}
         fall_vi = {}
         biomass = {}
 
         for m in models:
-            has_threshold = not str(m[sat].discriminate_index).lower().startswith('none')
-            if has_threshold:
-                summer_mask[m.name] = ls.threshold(m[sat].discriminate_index, m[sat].discriminate_threshold, qa_mask)
-            else:
-                summer_mask[m.name] = not_qa_mask
 
+            # summer
             summer_index = np.ma.array(ls.get_index(m[sat].summer_index), mask=qa_mask)
             if m[sat].summer_slp < 0 and m[sat].summer_int == 0:
                 a_min = None
             else:
                 a_min = 0.0
-            summer_vi[m.name] = summer_mask[m.name] * (m[sat].summer_int + m[sat].summer_slp * summer_index)
+            summer_vi[m.name] = not_qa_mask * (m[sat].summer_int + m[sat].summer_slp * summer_index)
             if a_min is not None:
                 summer_vi[m.name] = np.clip(summer_vi[m.name], a_min=a_min, a_max=None)
 
             if m[sat].log_transformed_estimate:
                 summer_vi[m.name] = np.exp(summer_vi[m.name])
 
-            if has_threshold:
-                fall_mask[m.name] = np.logical_not(summer_mask[m.name])
-            else:
-                fall_mask[m.name] = not_qa_mask
-
+            # fall
             fall_index = np.ma.array(ls.get_index(m[sat].fall_index), mask=qa_mask)
             if m[sat].fall_slp < 0 and m[sat].fall_int == 0:
                 a_min = None
             else:
                 a_min = 0.0
-            fall_vi[m.name] = fall_mask[m.name] * (m[sat].fall_int + m[sat].fall_slp * fall_index)
+            fall_vi[m.name] = not_qa_mask * (m[sat].fall_int + m[sat].fall_slp * fall_index)
             if a_min is not None:
                 fall_vi[m.name] = np.clip(fall_vi[m.name], a_min=a_min, a_max=None)
 
             if m[sat].log_transformed_estimate:
                 fall_vi[m.name] = np.exp(fall_vi[m.name])
 
-            # biomass is the sum of fall and summer
-            biomass[m.name] = summer_vi[m.name] + fall_vi[m.name]
+            # biomass
+            has_threshold = not str(m[sat].discriminate_index).lower().startswith('none')
+            if has_threshold:
+                summer_mask[m.name] = ls.threshold(m[sat].discriminate_index, m[sat].discriminate_threshold, qa_mask)
+                biomass[m.name] = summer_mask[m.name] * summer_vi[m.name] + np.logical_not(summer_mask[m.name]) * fall_vi[m.name]
+            else:
+                biomass[m.name] = summer_vi[m.name] + fall_vi[m.name]
+                summer_mask[m.name] = None
 
             if verbose:
                 print('summer')
@@ -182,7 +179,6 @@ class BiomassModel(object):
         self.not_qa_mask = not_qa_mask
         self.summer_mask = summer_mask
         self.summer_vi = summer_vi
-        self.fall_mask = fall_mask
         self.fall_vi = fall_vi
         self.biomass = biomass
         self.models = models
@@ -315,8 +311,11 @@ class BiomassModel(object):
                     d.fall_vi_mean_gpm = np.mean(np.ma.array(fall_vi[m.name], mask=pasture_mask))
 
                     # calculate the fraction of the pasture that is above the ndvi_threshold
-                    d.fraction_summer = np.sum(np.ma.array(summer_mask[m.name], mask=pasture_mask))
-                    d.fraction_summer /= float(total_px)
+                    if summer_mask[m.name] is not None:
+                        d.fraction_summer = np.sum(np.ma.array(summer_mask[m.name], mask=pasture_mask))
+                        d.fraction_summer /= float(total_px)
+                    else:
+                        d.fraction_summer = None
 
                     # keep track of the number of valid pastures models as a quality measure for the scene
                     # this can be more than the number of pastures if there is more than 1 model
