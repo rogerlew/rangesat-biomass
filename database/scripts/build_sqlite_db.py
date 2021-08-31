@@ -134,8 +134,14 @@ for location in locations:
                 if valid_px.replace('-', '') == '':
                     valid_px = '0'
 
-                if biomass_mean_gpm.replace('-', '') == '':
-                    biomass_mean_gpm = 'null'
+                # if biomass_mean_gpm.replace('-', '') == '':
+                #    biomass_mean_gpm = 'null'
+
+                if not isfloat(biomass_mean_gpm):
+                    continue
+
+                if float(biomass_mean_gpm) <= 0.0:
+                    continue
 
                 if biomass_ci90_gpm.replace('-', '') == '':
                     biomass_ci90_gpm = 'null'

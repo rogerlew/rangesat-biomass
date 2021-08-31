@@ -282,6 +282,8 @@ class LandSatScene(object):
             return self.ndwi
         elif indexname.lower() == 'sti':
             return self.sti
+        elif indexname.lower() == 'ndti':
+            return self.ndti
         elif indexname.lower() == 'swir1':
             return self.swir1
         elif indexname.lower() == 'swir2':
@@ -533,6 +535,11 @@ class LandSatScene(object):
     @property
     def sti(self):
         return self.swir1 / self.swir2
+
+    @property
+    def ndti(self):
+        sti = self.sti
+        return (sti - 1) / (sti + 1)
 
     @property
     def swir_ratio(self):

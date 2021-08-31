@@ -323,6 +323,33 @@ def scenemeta_location_product_id(location, product_id):
         return exception_factory()
 
 
+def dump_measure(ls_dir, product):
+    ls = LandSatScene(ls_dir)
+    data = ls.get_index(product)
+    dst_fn = _join(ls_dir, f'{product}.tif')
+    ls.dump(data, _join(ls_dir, dst_fn))
+    reproject_raster_to_wgs(dst_fn)
+
+
+def reproject_raster_to_wgs(src):
+    dst = src[:-4] + '.wgs.vrt'
+    dst2 = src[:-4] + '.wgs.tif'
+
+    if exists(dst):
+        os.remove(dst)
+    if exists(dst2):
+        os.remove(dst2)
+
+    cmd = ['gdalwarp', '-t_srs', 'EPSG:4326', '-of', 'vrt', src, dst]
+    p = Popen(cmd)
+    p.wait()
+
+    cmd = ['gdal_translate', '-co', 'COMPRESS=LZW', '-of', 'GTiff', dst, dst2]
+    p = Popen(cmd)
+    p.wait()
+    assert _exists(dst)
+
+
 @app.route('/raster/<location>/<product_id>/<product>')
 @app.route('/raster/<location>/<product_id>/<product>/')
 def raster(location, product_id, product):
@@ -341,20 +368,35 @@ def raster(location, product_id, product):
 
                 fn = []
                 if not utm:
-                    if product in ['ndvi', 'nbr', 'nbr2', 'pixel_qa', 'rgb', 'aerosol']:
+                    if product in ['ndvi', 'pixel_qa', 'rgb', 'aerosol']:
                         fn = glob(_join(out_dir, product_id, '*{}.wgs.tif'.format(product)))
 
                     elif product in ['biomass', 'fall_vi', 'summer_vi']:
                         fn = glob(_join(out_dir, product_id, 'biomass/*{}.wgs.tif'.format(product)))
+                    else:
+                        fn = glob(_join(out_dir, product_id, '*{}.wgs.tif'.format(product)))
+                        if len(fn) == 0:
+                            dump_measure(_join(out_dir, product_id), product)
+                        fn = glob(_join(out_dir, product_id, '*{}.wgs.tif'.format(product)))
                 else:
-                    if product in ['ndvi', 'nbr', 'nbr2', 'pixel_qa', 'rgb', 'aerosol']:
+                    if product in ['ndvi', 'pixel_qa', 'rgb', 'aerosol']:
                         fn = glob(_join(out_dir, product_id, '*{}.tif'.format(product)))
 
                     elif product in ['biomass', 'fall_vi', 'summer_vi']:
                         fn = glob(_join(out_dir, product_id, 'biomass/*{}.tif'.format(product)))
+                    else:
+                        fn = glob(_join(out_dir, product_id, '*{}.tif'.format(product)))
+                        if len(fn) == 0:
+                            dump_measure(_join(out_dir, product_id), product)
+                        fn = glob(_join(out_dir, product_id, '*{}.tif'.format(product)))
+                        
+                    
+                if len(fn) > 1:
+                    fn = [f for f in fn if 'T1_ndvi' in f]
 
                 if len(fn) != 1:
                     return jsonify(None)
+
                 fn = fn[0]
 
                 if not utm:

@@ -104,7 +104,7 @@ class BiomassModel(object):
         qa_water = ls.qa_water
 
         # build a composite mask
-        qa_mask = aerosol_mask + qa_notclear + qa_snow + qa_water
+        qa_mask = qa_notclear + qa_snow + qa_water + aerosol_mask
         qa_mask = qa_mask > 0
         not_qa_mask = np.logical_not(qa_mask)
 
