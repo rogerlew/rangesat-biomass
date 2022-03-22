@@ -103,7 +103,7 @@ _month_labels = ['January', 'February', 'March', 'April', 'May', 'June',
                  'July', 'August', 'September', 'October', 'November', 'December']
 
 
-def load_gridmet_single_year_monthly(directory, year, units='SI'):
+def load_gridmet_single_year_monthly(directory, year, units='SI', verbose=True):
 
     d = {}
     for var in _variables:
@@ -112,6 +112,9 @@ def load_gridmet_single_year_monthly(directory, year, units='SI'):
             d[var] = [float(x) for x in list(np.load(fn))]
         else:
             d[var] = None
+
+    if verbose:
+        print(directory, year)
 
     if d['pr'] is not None:
         d['dates'] = [str(date(int(year), 1, 1) + timedelta(i)) for i, _ in enumerate(d['pr'])]

@@ -59,13 +59,15 @@ class ModelPars(object):
 
 class ModelStat(object):
     def __init__(self, model=None, biomass_mean_gpm=None, biomass_ci90_gpm=None,
-                 biomass_10pct_gpm=None, biomass_75pct_gpm=None, biomass_90pct_gpm=None,
+                 biomass_10pct_gpm=None, biomass_50pct_gpm=None,  
+                 biomass_75pct_gpm=None, biomass_90pct_gpm=None,
                  biomass_total_kg=None, biomass_sd_gpm=None, summer_vi_mean_gpm=None,
                  fall_vi_mean_gpm=None, fraction_summer=None):
         self.model = model
         self.biomass_mean_gpm = biomass_mean_gpm
         self.biomass_ci90_gpm = biomass_ci90_gpm
         self.biomass_10pct_gpm = biomass_10pct_gpm
+        self.biomass_50pct_gpm = biomass_50pct_gpm
         self.biomass_75pct_gpm = biomass_75pct_gpm
         self.biomass_90pct_gpm = biomass_90pct_gpm
         self.biomass_total_kg = biomass_total_kg
@@ -79,6 +81,7 @@ class ModelStat(object):
                     biomass_mean_gpm=self.biomass_mean_gpm,
                     biomass_ci90_gpm=self.biomass_ci90_gpm,
                     biomass_10pct_gpm=self.biomass_10pct_gpm,
+                    biomass_50pct_gpm=self.biomass_50pct_gpm,
                     biomass_75pct_gpm=self.biomass_75pct_gpm,
                     biomass_90pct_gpm=self.biomass_90pct_gpm,
                     biomass_total_kg=self.biomass_total_kg,
@@ -89,7 +92,7 @@ class ModelStat(object):
 
 
 class BiomassModel(object):
-    def __init__(self, ls: LandSatScene, models: ModelPars, verbose=False):
+    def __init__(self, ls: LandSatScene, models: ModelPars, verbose=True):
 
         sat = ls.satellite
 
@@ -104,11 +107,17 @@ class BiomassModel(object):
         qa_water = ls.qa_water
 
         # build a composite mask
-        qa_mask = qa_notclear + qa_snow + qa_water + aerosol_mask
+#        qa_mask = qa_notclear + qa_snow + qa_water + aerosol_mask
+        qa_mask = qa_snow + qa_water # + aerosol_mask
         qa_mask = qa_mask > 0
         not_qa_mask = np.logical_not(qa_mask)
 
         if verbose:
+            print('qa_notclear', np.sum(qa_notclear))
+            print('qa_snow', np.sum(qa_snow))
+            print('qa_water', np.sum(qa_water))
+            print('aerosol_mask', np.sum(aerosol_mask))
+            print('qa_mask', np.sum(qa_mask))
             print('not_qa_mask', np.sum(not_qa_mask))
 
         #
@@ -120,14 +129,14 @@ class BiomassModel(object):
         biomass = {}
 
         for m in models:
-
             # summer
-            summer_index = np.ma.array(ls.get_index(m[sat].summer_index), mask=qa_mask)
+#            summer_index = np.ma.array(ls.get_index(m[sat].summer_index), mask=qa_mask)
+            summer_index = ls.get_index(m[sat].summer_index)
             if m[sat].summer_slp < 0 and m[sat].summer_int == 0:
                 a_min = None
             else:
                 a_min = 0.0
-            summer_vi[m.name] = not_qa_mask * (m[sat].summer_int + m[sat].summer_slp * summer_index)
+            summer_vi[m.name] =  m[sat].summer_int + m[sat].summer_slp * summer_index
             if a_min is not None:
                 summer_vi[m.name] = np.clip(summer_vi[m.name], a_min=a_min, a_max=None)
 
@@ -135,12 +144,13 @@ class BiomassModel(object):
                 summer_vi[m.name] = np.exp(summer_vi[m.name])
 
             # fall
-            fall_index = np.ma.array(ls.get_index(m[sat].fall_index), mask=qa_mask)
+#            fall_index = np.ma.array(ls.get_index(m[sat].fall_index), mask=qa_mask)
+            fall_index = ls.get_index(m[sat].fall_index)
             if m[sat].fall_slp < 0 and m[sat].fall_int == 0:
                 a_min = None
             else:
                 a_min = 0.0
-            fall_vi[m.name] = not_qa_mask * (m[sat].fall_int + m[sat].fall_slp * fall_index)
+            fall_vi[m.name] = m[sat].fall_int + m[sat].fall_slp * fall_index
             if a_min is not None:
                 fall_vi[m.name] = np.clip(fall_vi[m.name], a_min=a_min, a_max=None)
 
@@ -295,10 +305,11 @@ class BiomassModel(object):
                     d.biomass_total_kg = d.biomass_mean_gpm * area_ha * 10
 
                     # determine the 10th, 75th and 90th percentiles of the distribution
-                    percentiles = _quantile(pasture_biomass, [0.1, 0.75, 0.9])
+                    percentiles = _quantile(pasture_biomass, [0.1, 0.5, 0.75, 0.9])
                     d.biomass_10pct_gpm = percentiles[0]
-                    d.biomass_75pct_gpm = percentiles[1]
-                    d.biomass_90pct_gpm = percentiles[2]
+                    d.biomass_10pct_gpm = percentiles[1]
+                    d.biomass_75pct_gpm = percentiles[2]
+                    d.biomass_90pct_gpm = percentiles[3]
 
                     # calculate the standard deviation of biomass in the pasture
                     d.biomass_sd_gpm = np.std(pasture_biomass)
@@ -328,28 +339,31 @@ class BiomassModel(object):
             _ndvi = np.ma.array(self.ndvi, mask=pasture_mask)
             ls_stats['ndvi_mean'] = np.mean(_ndvi)
             ls_stats['ndvi_sd'] = np.std(_ndvi)
-            _ndvi_percentiles = _quantile(_ndvi, [0.1, 0.75, 0.9])
+            _ndvi_percentiles = _quantile(_ndvi, [0.1, 0.5, 0.75, 0.9])
             ls_stats['ndvi_10pct'] = _ndvi_percentiles[0]
-            ls_stats['ndvi_75pct'] = _ndvi_percentiles[1]
-            ls_stats['ndvi_90pct'] = _ndvi_percentiles[2]
+            ls_stats['ndvi_50pct'] = _ndvi_percentiles[1]
+            ls_stats['ndvi_75pct'] = _ndvi_percentiles[2]
+            ls_stats['ndvi_90pct'] = _ndvi_percentiles[3]
             ls_stats['ndvi_ci90'] = 1.645 * (ls_stats['ndvi_sd'] / sqrt(valid_px))
         
             _nbr = np.ma.array(self.nbr, mask=pasture_mask)
             ls_stats['nbr_mean'] = np.mean(_nbr)
             ls_stats['nbr_sd'] = np.std(_nbr)
-            _nbr_percentiles = _quantile(_nbr, [0.1, 0.75, 0.9])
+            _nbr_percentiles = _quantile(_nbr, [0.1, 0.5, 0.75, 0.9])
             ls_stats['nbr_10pct'] = _nbr_percentiles[0]
-            ls_stats['nbr_75pct'] = _nbr_percentiles[1]
-            ls_stats['nbr_90pct'] = _nbr_percentiles[2]
+            ls_stats['nbr_50pct'] = _nbr_percentiles[1]
+            ls_stats['nbr_75pct'] = _nbr_percentiles[2]
+            ls_stats['nbr_90pct'] = _nbr_percentiles[3]
             ls_stats['nbr_ci90'] = 1.645 * (ls_stats['nbr_sd'] / sqrt(valid_px))
 
             _nbr2 = np.ma.array(self.nbr2, mask=pasture_mask)
             ls_stats['nbr2_mean'] = np.mean(_nbr2)
             ls_stats['nbr2_sd'] = np.std(_nbr2)
-            _nbr2_percentiles = _quantile(_nbr2, [0.1, 0.75, 0.9])
+            _nbr2_percentiles = _quantile(_nbr2, [0.1, 0.5, 0.75, 0.9])
             ls_stats['nbr2_10pct'] = _nbr2_percentiles[0]
-            ls_stats['nbr2_75pct'] = _nbr2_percentiles[1]
-            ls_stats['nbr2_90pct'] = _nbr2_percentiles[2]
+            ls_stats['nbr2_50pct'] = _nbr2_percentiles[1]
+            ls_stats['nbr2_75pct'] = _nbr2_percentiles[2]
+            ls_stats['nbr2_90pct'] = _nbr2_percentiles[3]
             ls_stats['nbr2_ci90'] = 1.645 * (ls_stats['nbr2_sd'] / sqrt(valid_px))
 
             # store the pasture results

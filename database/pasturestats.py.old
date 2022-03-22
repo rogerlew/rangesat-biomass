@@ -68,6 +68,12 @@ def _sortkeypicker(keynames):
 
     return getit
 
+
+def _reverse_key(key, key_delimiter):
+    return f'{key_delimiter}'.join(key.split(key_delimiter)[::-1])
+
+
+
 def query_scene_product_ids(db_fn):
     conn = sqlite3.connect(db_fn)
     c = conn.cursor()
@@ -132,7 +138,7 @@ def query_pasture_stats(db_fn, ranch=None, acquisition_date=None, pasture=None):
 
 def query_singleyear_pasture_stats(db_fn, ranch=None, pasture=None, year=None,
                                   start_date=None, end_date=None, agg_func=np.mean,
-                                  key_delimiter='+'):
+                                  key_delimiter='+', reverse_key=False):
     if start_date is None:
         start_date = '1-1'
 
@@ -177,21 +183,22 @@ def query_singleyear_pasture_stats(db_fn, ranch=None, pasture=None, year=None,
     rows = [dict(zip(_header, row)) for m, row in zip(mask, rows) if m]
     rows = [d for d in rows if d['biomass_mean_gpm'] is not None]
     rows = sorted(rows, key=lambda k: k['acquisition_date'])
-   
-    for i in range(len(rows)):
-        rows[i]['key'] = '{}{}{}'.format(rows[i]['pasture'], key_delimiter, rows[i]['ranch'])
+    
+    if reverse_key:
+        for i in range(len(rows)):
+            rows[i]['key'] = _reverse_key(rows[i]['key'], key_delimiter)
             
     return rows
 
 
 def query_intrayear_pasture_stats(db_fn, ranch=None, pasture=None, year=None,
                                   start_date=None, end_date=None, agg_func=np.mean,
-                                  key_delimiter='+'):
+                                  key_delimiter='+', reverse_key=False):
     rows = query_singleyear_pasture_stats(db_fn, ranch=ranch, pasture=pasture, year=year,
                                           start_date=start_date, end_date=end_date, agg_func=agg_func,
-                                          key_delimiter=key_delimiter)
+                                          key_delimiter=key_delimiter, reverse_key=reverse_key)
 
-    keys = set('{}{}{}'.format(row['pasture'], key_delimiter, row['ranch']) for row in rows)
+    keys = set(row['key'] for row in rows)
 
     d = {key: [] for key in keys}
 
@@ -204,6 +211,7 @@ def query_intrayear_pasture_stats(db_fn, ranch=None, pasture=None, year=None,
         try:
             _pasture, _ranch = key.split(key_delimiter)
         except:
+            print(key)
             agg[-1]['pasture'] = key
             agg[-1]['ranch'] = None
 
@@ -215,13 +223,13 @@ def query_intrayear_pasture_stats(db_fn, ranch=None, pasture=None, year=None,
 
 def query_max_pasture_seasonal_pasture_stats(db_fn, ranch=None, pasture=None, year=None,
                                              start_date=None, end_date=None, measure='biomass_mean_gpm',
-                                             key_delimiter='+'):
+                                             key_delimiter='+', reverse_key=False):
 
     rows = query_singleyear_pasture_stats(db_fn, ranch=ranch, pasture=pasture, year=year,
                                           start_date=start_date, end_date=end_date, agg_func=None,
-                                          key_delimiter=key_delimiter)
+                                          key_delimiter=key_delimiter, reverse_key=reverse_key)
 
-    keys = set('{}{}{}'.format(row['pasture'], key_delimiter, row['ranch']) for row in rows)
+    keys = set(row['key'] for row in rows)
 
     d = {key: [] for key in keys}
 
@@ -240,7 +248,7 @@ def query_max_pasture_seasonal_pasture_stats(db_fn, ranch=None, pasture=None, ye
 def query_singleyearmonthly_pasture_stats(db_fn, ranch=None, pasture=None, year=None,
                                           start_date=None, end_date=None,
                                          agg_func=np.mean,
-                                         key_delimiter='+'):
+                                         key_delimiter='+', reverse_key=False):
     if year is None:
         year = datetime.now().year
 
@@ -252,9 +260,9 @@ def query_singleyearmonthly_pasture_stats(db_fn, ranch=None, pasture=None, year=
 
     rows = query_singleyear_pasture_stats(db_fn, ranch=ranch, pasture=pasture, year=year,
                                           start_date=start_date, end_date=end_date, agg_func=agg_func,
-                                          key_delimiter=key_delimiter)
+                                          key_delimiter=key_delimiter, reverse_key=reverse_key)
 
-    keys = set('{}{}{}'.format(row['pasture'], key_delimiter, row['ranch']) for row in rows)
+    keys = set(row['key'] for row in rows)
 
     monthlies = {key: [[] for i in range(12)] for key in keys}
     for i, row in enumerate(rows):
@@ -291,7 +299,7 @@ def query_singleyearmonthly_pasture_stats(db_fn, ranch=None, pasture=None, year=
 def query_singleyearmonthly_ranch_stats(db_fn, ranch=None, year=None,
                                         start_date=None, end_date=None,
                                         agg_func=np.mean,
-                                        key_delimiter='+'):
+                                        key_delimiter='+', reverse_key=False):
     if year is None:
         year = datetime.now().year
 
@@ -303,7 +311,7 @@ def query_singleyearmonthly_ranch_stats(db_fn, ranch=None, year=None,
 
     rows = query_singleyear_pasture_stats(db_fn, ranch=ranch, pasture=None, year=year,
                                           start_date=start_date, end_date=end_date, agg_func=agg_func,
-                                          key_delimiter=key_delimiter)
+                                          key_delimiter=key_delimiter, reverse_key=reverse_key)
 
     keys = set(row['ranch'] for row in rows)
 
@@ -341,7 +349,8 @@ def query_singleyearmonthly_ranch_stats(db_fn, ranch=None, year=None,
 
 def query_seasonalprogression_pasture_stats(db_fn, ranch=None, pasture=None,
                                             start_year=None, end_year=None,
-                                            agg_func=np.mean, key_delimiter='+'):
+                                            agg_func=np.mean, key_delimiter='+',
+                                            reverse_key=False):
     if end_year is None:
         end_year = datetime.now().year
     else:
@@ -378,10 +387,11 @@ def query_seasonalprogression_pasture_stats(db_fn, ranch=None, pasture=None,
     rows = c.fetchall()
     rows = [dict(zip(_header, row)) for row in rows]
     
-    for i in range(len(rows)):
-        rows[i]['key'] = '{}{}{}'.format(rows[i]['pasture'], key_delimiter, rows[i]['ranch'])
+    if reverse_key:
+        for i in range(len(rows)):
+            rows[i]['key'] = _reverse_key(rows[i]['key'], key_delimiter)
             
-    keys = set('{}{}{}'.format(row['pasture'], key_delimiter, row['ranch']) for row in rows)
+    keys = set(row['key'] for row in rows)
 
     monthlies = {key: [[] for i in range(12)] for key in keys}
     for i, row in enumerate(rows):
@@ -423,7 +433,8 @@ def query_seasonalprogression_pasture_stats(db_fn, ranch=None, pasture=None,
 
 def query_seasonalprogression_ranch_stats(db_fn, ranch=None,
                                             start_year=None, end_year=None,
-                                            agg_func=np.mean, key_delimiter='+'):
+                                            agg_func=np.mean, key_delimiter='+',
+                                            reverse_key=False):
 
     pasture = None
 
@@ -463,8 +474,9 @@ def query_seasonalprogression_ranch_stats(db_fn, ranch=None,
     rows = c.fetchall()
     rows = [dict(zip(_header, row)) for row in rows]
 
-    for i in range(len(rows)):
-        rows[i]['key'] = '{}{}{}'.format(rows[i]['pasture'], key_delimiter, rows[i]['ranch'])
+    if reverse_key:
+        for i in range(len(rows)):
+            rows[i]['key'] = _reverse_key(rows[i]['key'], key_delimiter)
             
     keys = set(row['ranch'] for row in rows)
 
@@ -507,11 +519,11 @@ def query_seasonalprogression_ranch_stats(db_fn, ranch=None,
 
 def query_interyear_pasture_stats(db_fn, ranch=None, pasture=None, start_year=None, end_year=None,
                                   start_date=None, end_date=None, agg_func=np.mean,
-                                  key_delimiter='+'):
+                                  key_delimiter='+', reverse_key=False):
 
 
     agg = query_multiyear_pasture_stats(db_fn, ranch, pasture, start_year, end_year, start_date, end_date, agg_func,
-                                        key_delimiter)
+                                        key_delimiter, reverse_key=reverse_key)
 
     # identify pasture+ranch keys
     keys = set((res['pasture'], res['ranch']) for res in agg)
@@ -573,14 +585,15 @@ def query_interyear_pasture_stats(db_fn, ranch=None, pasture=None, start_year=No
     # build list of dicts of pasture stats
     rows = [dict(zip(_header, row)) for m, row in zip(mask, rows) if m]
 
-    for i in range(len(rows)):
-        rows[i]['key'] = '{}{}{}'.format(rows[i]['pasture'], key_delimiter, rows[i]['ranch'])
+    if reverse_key:
+        for i in range(len(rows)):
+            rows[i]['key'] = _reverse_key(rows[i]['key'], key_delimiter)
             
     # remove stats that don't have biomass
     rows = [d for d in rows if d['biomass_mean_gpm'] is not None]
 
     # identify pasture+ranch keys
-    keys = set('{}{}{}'.format(row['pasture'], key_delimiter, row['ranch']) for row in rows)
+    keys = set(row['key'] for row in rows)
 
     d = {key: [] for key in keys}
 
@@ -605,7 +618,7 @@ def query_interyear_pasture_stats(db_fn, ranch=None, pasture=None, start_year=No
 
 def query_multiyear_pasture_stats(db_fn, ranch=None, pasture=None, start_year=None, end_year=None,
                                   start_date=None, end_date=None, agg_func=np.mean,
-                                  key_delimiter='+'):
+                                  key_delimiter='+', reverse_key=False):
     if end_year is None:
         end_year = datetime.now().year
     if start_year is None:
@@ -641,7 +654,9 @@ def query_multiyear_pasture_stats(db_fn, ranch=None, pasture=None, start_year=No
     c.execute(query)
     rows = c.fetchall()
     dates = [date(*map(int, row[-1].split('-'))) for row in rows]
-    keys = set('{}{}{}'.format(row[2], key_delimiter, row[3]) for row in rows)
+    keys = set(row[1] for row in rows)
+    if reverse_key:
+        keys = set(_reverse_key(key, key_delimiter) for key in keys)
 
     agg = []
     start_year = int(start_year)
@@ -654,8 +669,9 @@ def query_multiyear_pasture_stats(db_fn, ranch=None, pasture=None, start_year=No
             continue
 
         __rows = [dict(zip(_header, row)) for m, row in zip(mask, rows) if m]
-        for i in range(len(__rows)):
-            __rows[i]['key'] = '{}{}{}'.format(__rows[i]['pasture'], key_delimiter, __rows[i]['ranch'])
+        if reverse_key:
+            for i in range(len(__rows)):
+                __rows[i]['key'] = _reverse_key(__rows[i]['key'], key_delimiter)
             
         _rows = []
         for d in __rows:
@@ -672,7 +688,7 @@ def query_multiyear_pasture_stats(db_fn, ranch=None, pasture=None, start_year=No
        
         d = {key: [] for key in keys}
         for row in _rows:
-            d['{}{}{}'.format(row['pasture'], key_delimiter, row['ranch'])].append(row)
+            d[row['key']].append(row)
 
         for key in d:
             agg.append(_aggregate(d[key], agg_func))
@@ -687,7 +703,7 @@ def query_multiyear_pasture_stats(db_fn, ranch=None, pasture=None, start_year=No
 
 def query_multiyear_ranch_stats(db_fn, ranch=None, pasture=None, start_year=None, end_year=None,
                                   start_date=None, end_date=None, agg_func=np.mean,
-                                  key_delimiter='+'):
+                                  key_delimiter='+', reverse_key=False):
     if end_year is None:
         end_year = datetime.now().year
     if start_year is None:
@@ -724,7 +740,9 @@ def query_multiyear_ranch_stats(db_fn, ranch=None, pasture=None, start_year=None
     rows = c.fetchall()
     dates = [date(*map(int, row[-1].split('-'))) for row in rows]
 
-    keys = set('{}{}{}'.format(row[2], key_delimiter, row[3]) for row in rows)
+    keys = set(row[1] for row in rows)
+    if reverse_key:
+        keys = set(_reverse_key(key, key_delimiter) for key in keys)
 
     keys = set(key.split(key_delimiter)[-1] for key in keys)
 
@@ -739,9 +757,9 @@ def query_multiyear_ranch_stats(db_fn, ranch=None, pasture=None, start_year=None
             continue
 
         _rows = [dict(zip(_header, row)) for m, row in zip(mask, rows) if m]
-
-        for i in range(len(_rows)):
-            _rows[i]['key'] = '{}{}{}'.format(_rows[i]['pasture'], key_delimiter, _rows[i]['ranch'])
+        if reverse_key:
+            for i in range(len(_rows)):
+                _rows[i] = _reverse_key(_rows[i]['key'], key_delimiter)
 
         _rows = [d for d in _rows if d['biomass_mean_gpm'] is not None]
 

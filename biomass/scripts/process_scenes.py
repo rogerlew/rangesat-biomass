@@ -48,8 +48,9 @@ def process_scene(scn_fn):
 def is_processed(fn):
     global out_dir
     _fn = _split(fn)[-1].split('-')[0]
-    res = glob(_join(out_dir, '{}_*_{}_{}_*_{}_{}'
-               .format(_fn[:4], _fn[4:10], _fn[10:18], _fn[18:20], _fn[20:22])))
+#    res = glob(_join(out_dir, '{}_*_{}_{}_*_{}_{}'
+#               .format(_fn[:4], _fn[4:10], _fn[10:18], _fn[18:20], _fn[20:22])))
+    res = glob(_join(out_dir, fn.replace('.tar.gz', '') + '*.csv'))
     return len(res) > 0 or _exists(_join(out_dir, '.{}'.format(_split(fn.replace('.tar.gz', ''))[-1])))
 
 #
@@ -101,10 +102,11 @@ if __name__ == '__main__':
 #    os.makedirs(out_dir)
 
     # find all the scenes
-    fns = glob(_join(landsat_scene_directory, '*.tar.gz'))
+    fns = glob(_join(landsat_scene_directory, '*2021*-*.tar.gz'))
 
-    print(landsat_scene_directory, fns)
+#    print(landsat_scene_directory, fns)
 
+    """
     if wrs_blacklist:
         _fns = []
         for fn in fns:
@@ -121,19 +123,20 @@ if __name__ == '__main__':
                 _fns.append(fn)
 
         fns = _fns
+     """
 
-#    fns = [fn for fn in fns if not is_processed(fn)]
+    fns = [fn for fn in fns if not is_processed(fn)]
 
-    fns = [fn for fn in fns if not _exists(_join(out_dir, '.' +  _split(fn)[-1].replace('.tar.gz', '')))]
+#    fns = [fn for fn in fns if not _exists(_join(out_dir, '.' +  _split(fn)[-1].replace('.tar.gz', '')))]
 #    random.shuffle(fns)
 
-    if years:
-        _fns = []
-        for fn in fns:
-            if int(_split(fn)[-1][10:14]) in years:
-                _fns.append(fn)
-
-        fns = _fns
+#    if years:
+#        _fns = []
+#        for fn in fns:
+#            if int(_split(fn)[-1][10:14]) in years:
+#                _fns.append(fn)
+#
+#        fns = _fns
 
     if use_multiprocessing:
         # run the model

@@ -137,14 +137,14 @@ def dump_pasture_stats(results, dst_fn):
         fieldnames = ['product_id', 'key', 'total_px', 'snow_px', 'water_px',
                       'aerosol_px', 'valid_px', 'coverage', 'area_ha',
                       'model', 'biomass_mean_gpm', 'biomass_ci90_gpm',
-                      'biomass_10pct_gpm', 'biomass_75pct_gpm', 'biomass_90pct_gpm',
+                      'biomass_10pct_gpm', 'biomass_50pct_gpm', 'biomass_75pct_gpm', 'biomass_90pct_gpm',
                       'biomass_total_kg', 'biomass_sd_gpm', 'summer_vi_mean_gpm',
                       'fall_vi_mean_gpm', 'fraction_summer',
                       'product_id', 'satellite', 'acquisition_date',
                       'wrs', 'bounds', 'wgs_bounds', 'valid_pastures_cnt',
-                      'ndvi_mean', 'ndvi_sd', 'ndvi_10pct', 'ndvi_75pct', 'ndvi_90pct', 'ndvi_ci90',
-                      'nbr_mean', 'nbr_sd', 'nbr_10pct', 'nbr_75pct', 'nbr_90pct', 'nbr_ci90',
-                      'nbr2_mean', 'nbr2_sd', 'nbr2_10pct', 'nbr2_75pct', 'nbr2_90pct', 'nbr2_ci90']
+                      'ndvi_mean', 'ndvi_sd', 'ndvi_10pct', 'ndvi_50pct', 'ndvi_75pct', 'ndvi_90pct', 'ndvi_ci90',
+                      'nbr_mean', 'nbr_sd', 'nbr_10pct', 'nbr_50pct',  'nbr_75pct', 'nbr_90pct', 'nbr_ci90',
+                      'nbr2_mean', 'nbr2_sd', 'nbr2_10pct', 'nbr2_50pct', 'nbr2_75pct', 'nbr2_90pct', 'nbr2_ci90']
         
         writer = csv.DictWriter(_fp, fieldnames=fieldnames)
         writer.writeheader()

@@ -16,11 +16,12 @@ from subprocess import Popen
 import rasterio
 from rasterio.mask import raster_geometry_mask
 
+from osgeo import gdal
 from osgeo import osr
 
 sys.path.insert(0, os.path.abspath('../'))
 
-from all_your_base import GEODATA_DIRS
+from all_your_base import GEODATA_DIRS, rat_extract
 
 
 def wkt_2_proj4(wkt):
@@ -58,11 +59,16 @@ class Location(object):
         sf_fn = os.path.abspath(sf_fn)
         sf = fiona.open(sf_fn, 'r')
 
+        reverse_key = self.reverse_key
+
         pastures = {}
         for feature in sf:
             properties = feature['properties']
             key = properties[sf_feature_properties_key].replace(' ', '_')
+            
             pasture, ranch = key.split(self.key_delimiter)
+            if reverse_key:
+                ranch, pasture = pasture, ranch
 
             if ranch.lower() not in [p.lower() for p in pastures]:
                 pastures[ranch] = set()
@@ -117,6 +123,10 @@ class Location(object):
         return _join(self.loc_path, self._d['out_dir'])
 
     @property
+    def mask_dir(self):
+        return _join(self.loc_path, 'raster_masks')
+
+    @property
     def db_fn(self):
         return _join(self.loc_path, self._d['out_dir'], 'sqlite3.db')
 
@@ -135,6 +145,35 @@ class Location(object):
                  area_ha=area_ha, bbox=bbox)
         return d
 
+
+    def extract_pixels_opt(self, raster_fn, ranch=None, pasture=None):
+
+        if ranch is not None:
+            ranch = ranch.replace(' ', '_')
+
+        if pasture is not None:
+            pasture = pasture.replace(' ', '_')
+
+        ds = rasterio.open(raster_fn)
+
+        if ranch is None and pasture is None:
+            x = ds.read(1, masked=True)
+            return x.compressed(), x.count() 
+
+        ds_proj4 = ds.crs.to_proj4()
+        prj = ('utm', 'wgs')[ds.crs.is_geographic]
+
+        mask_dir = self.mask_dir
+        mask_fn = _join(self.mask_dir, f'{ranch}.{prj}.tif')
+
+        ms = rasterio.open(mask_fn)
+
+        # true where valid
+        pasture_mask = ms.read(1, masked=True)
+        x = np.ma.array(ds.read(1, masked=True), mask=pasture_mask)
+        return x.compressed().tolist(), int(x.count())
+
+
     def extract_pixels(self, raster_fn, ranch=None, pasture=None):
 
         if ranch is not None:
@@ -142,6 +181,9 @@ class Location(object):
 
         if pasture is not None:
             pasture = pasture.replace(' ', '_')
+
+        if pasture is None:
+           raise NotImplementedError("Cannot process request")
 
         ds = rasterio.open(raster_fn)
         ds_proj4 = ds.crs.to_proj4()
@@ -160,6 +202,8 @@ class Location(object):
             key = properties[sf_feature_properties_key].replace(' ', '_')
 
             _pasture, _ranch = key.split(self.key_delimiter)
+            if self.reverse_key:
+                _ranch, _pasture = _pasture, _ranch
     
             if ranch is not None:
                 if _ranch.lower() != ranch.lower():
@@ -179,8 +223,49 @@ class Location(object):
 
         pasture_mask, _, _ = raster_geometry_mask(ds, features)
 
-        x = data[np.logical_not(pasture_mask)]
-        return [float(x) for x in x[x.mask == False]], int(np.sum(np.logical_not(pasture_mask)))
+        x = np.ma.MaskedArray(data, mask=pasture_mask)
+        return  x.compressed().tolist(), int(x.count())
+
+    def extract_pixels_by_pasture_opt(self, raster_fn, ranch):
+
+        if ranch is not None:
+            ranch = ranch.replace(' ', '_')
+
+        ds = rasterio.open(raster_fn)
+        ds_proj4 = ds.crs.to_proj4()
+        prj = ('utm', 'wgs')[ds.crs.is_geographic]
+
+        loc_path = self.loc_path
+        _d = self._d
+
+        data = ds.read(1, masked=True)
+
+        mask_dir = self.mask_dir
+        ranch_mask_fn = _join(self.mask_dir, f'{ranch}.{prj}.tif')
+        ranch_ms = rasterio.open(ranch_mask_fn)
+        ranch_indx = np.where(ranch_ms.read(1) == 0)
+
+        data = data[ranch_indx]
+
+        mask_fn = _join(self.mask_dir, f'{ranch}.pastures.{prj}.tif')
+        ms = rasterio.open(mask_fn)
+
+        # true where valid
+        pastures_mask = ms.read(1, masked=True)
+        pastures_mask = pastures_mask[ranch_indx]
+
+        rat = rat_extract(mask_fn)
+
+#        if 'biomass' in raster_fn:
+#            data = np.ma.masked_values(data, 0)
+
+        _data = {}
+        for px, row in rat.items():
+            _pasture = row['PASTURE']
+            x = data[np.where(pastures_mask == px)].tolist()
+            _data[(ranch, _pasture)] = x, len(x)
+
+        return _data
 
     def extract_pixels_by_pasture(self, raster_fn, ranch=None):
 
@@ -209,6 +294,8 @@ class Location(object):
             key = properties[sf_feature_properties_key].replace(' ', '_')
 
             _pasture, _ranch = key.split(self.key_delimiter)
+            if self.reverse_key:
+                _ranch, _pasture = _pasture, _ranch
   
             if ranch is not None:
                 if _ranch.lower() != ranch.lower():
@@ -217,8 +304,8 @@ class Location(object):
             _features = transform_geom(sf.crs_wkt, ds_proj4, feature['geometry'])
             pasture_mask, _, _ = raster_geometry_mask(ds, [_features])
 
-            x = data[np.logical_not(pasture_mask)]
-            _data[(_ranch, _pasture)] = [float(x) for x in x[x.mask == False]], int(np.sum(np.logical_not(pasture_mask)))
+            x = np.ma.MaskedArray(data, mask=pasture_mask)
+            _data[(_ranch, _pasture)] = x.compressed().tolist(), int(x.count())
 
         return _data
 
@@ -250,6 +337,8 @@ class Location(object):
             _key = properties[sf_feature_properties_key].replace(' ', '_')
 
             _pasture, _ranch = _key.split(self.key_delimiter)
+            if self.reverse_key:
+                _ranch, _pasture = _pasture, _ranch
 
             if _ranch.lower() == target_ranch and _pasture.lower() == target_pasture:
                 _features = transform_geom(sf.crs_wkt, ds_proj4, feature['geometry'])
@@ -261,6 +350,313 @@ class Location(object):
         pasture_mask, _, _ = raster_geometry_mask(ds, features)
         indx = np.where(pasture_mask == False)
         return indx
+
+    @property
+    def reverse_key(self):
+        return self._d.get('reverse_key', False)
+
+    def make_pastures_mask(self, raster_fn, ranch, dst_fn, nodata=-9999):
+        """
+
+        :param raster_fn: utm raster
+        :param ranches:
+        :param dst_fn:
+        :param nodata:
+        :return:
+        """
+
+        assert _exists(_split(dst_fn)[0])
+        assert dst_fn.endswith('.tif')
+
+        ds = rasterio.open(raster_fn)
+        ds_proj4 = ds.crs.to_proj4()
+
+        loc_path = self.loc_path
+        _d = self._d
+
+        sf_fn = _join(loc_path, _d['sf_fn'])
+        sf_feature_properties_key = _d['sf_feature_properties_key']
+        sf_fn = os.path.abspath(sf_fn)
+        sf = fiona.open(sf_fn, 'r')
+
+        reverse_key = self.reverse_key
+        pastures = {}
+        pastures_mask = np.zeros(ds.shape, dtype=np.uint16)
+
+        for feature in sf:
+            properties = feature['properties']
+            key = properties[sf_feature_properties_key].replace(' ', '_')
+
+            if not reverse_key:
+                _pasture, _ranch = key.split(self.key_delimiter)
+            else:
+                _ranch, _pasture = key.split(self.key_delimiter)
+
+            if _ranch.lower() != ranch.lower():
+                continue
+
+            if _pasture not in pastures:
+                pastures[_pasture] = len(pastures) + 1
+
+            # true where valid
+            _features = transform_geom(sf.crs_wkt, ds_proj4, feature['geometry'])
+            _mask, _, _ = raster_geometry_mask(ds, [_features])
+            k = pastures[_pasture]
+
+            # update pastures_mask
+            pastures_mask[np.where(_mask == False)] = k
+
+        utm_dst_fn = ''
+        try:
+            head, tail = _split(dst_fn)
+            utm_dst_fn = _join(head, tail.replace('.tif', '.utm.tif'))
+            dst_vrt_fn = _join(head, tail.replace('.tif', '.wgs.vrt'))
+            dst_wgs_fn = _join(head, tail.replace('.tif', '.wgs.tif'))
+
+
+            with rasterio.Env():
+                profile = ds.profile
+                dtype = rasterio.uint16
+                profile.update(
+                    count=1,
+                    dtype=rasterio.uint16,
+                    nodata=nodata,
+                    compress='lzw')
+
+                with rasterio.open(utm_dst_fn, 'w', **profile) as dst:
+                    dst.write(pastures_mask.astype(dtype), 1)
+
+            assert _exists(utm_dst_fn)
+        except:
+            raise
+
+        try:
+
+            if _exists(dst_vrt_fn):
+                os.remove(dst_vrt_fn)
+
+            cmd = ['gdalwarp', '-t_srs', 'EPSG:4326', '-of', 'vrt', utm_dst_fn, dst_vrt_fn]
+            p = Popen(cmd)
+            p.wait()
+
+            assert _exists(dst_vrt_fn)
+        except:
+            if _exists(dst_vrt_fn):
+                os.remove(dst_vrt_fn)
+            raise
+
+        try:
+            if _exists(dst_fn):
+                os.remove(dst_fn)
+
+            cmd = ['gdal_translate', '-co', 'COMPRESS=LZW', '-of', 'GTiff', dst_vrt_fn, dst_wgs_fn]
+            p = Popen(cmd)
+            p.wait()
+
+            assert _exists(dst_wgs_fn)
+        except:
+            if _exists(dst_wgs_fn):
+                os.remove(dst_wgs_fn)
+            raise
+
+        if _exists(dst_vrt_fn):
+            os.remove(dst_vrt_fn)
+
+
+        for OUTPUT_RASTER in (dst_wgs_fn, utm_dst_fn):
+            # https://gdal.org/python/osgeo.gdal.RasterAttributeTable-class.html
+            # https://gdal.org/python/osgeo.gdalconst-module.html
+            ds = gdal.Open(OUTPUT_RASTER)
+            rb = ds.GetRasterBand(1)
+
+	        # Create and populate the RAT
+            rat = gdal.RasterAttributeTable()
+            rat.CreateColumn('VALUE', gdal.GFT_Integer, gdal.GFU_Generic)
+            rat.CreateColumn('PASTURE', gdal.GFT_String, gdal.GFU_Generic)
+             
+            for i, (pasture, key) in enumerate(pastures.items()):
+                rat.SetValueAsInt(i, 0, key)
+                rat.SetValueAsString(i, 1, pasture)
+
+            # Associate with the band
+            rb.SetDefaultRAT(rat)
+
+            # Close the dataset and persist the RAT
+            ds = None
+
+
+    def make_ranch_mask(self, raster_fn, ranches, dst_fn, nodata=-9999):
+        """
+
+        :param raster_fn: utm raster
+        :param ranches:
+        :param dst_fn:
+        :param nodata:
+        :return:
+        """
+
+        assert _exists(_split(dst_fn)[0])
+        assert dst_fn.endswith('.tif')
+
+        ds = rasterio.open(raster_fn)
+        ds_proj4 = ds.crs.to_proj4()
+
+        loc_path = self.loc_path
+        _d = self._d
+
+        sf_fn = _join(loc_path, _d['sf_fn'])
+        sf_feature_properties_key = _d['sf_feature_properties_key']
+        sf_fn = os.path.abspath(sf_fn)
+        sf = fiona.open(sf_fn, 'r')
+
+        reverse_key = self.reverse_key
+
+        features = []
+        for feature in sf:
+            properties = feature['properties']
+            key = properties[sf_feature_properties_key].replace(' ', '_')
+
+            if not reverse_key:
+                _pasture, _ranch = key.split(self.key_delimiter)
+            else:
+                _ranch, _pasture = key.split(self.key_delimiter)
+
+            if any(_ranch.lower() == r.lower() for r in ranches):
+                _features = transform_geom(sf.crs_wkt, ds_proj4, feature['geometry'])
+                features.append(_features)
+
+        utm_dst_fn = ''
+        try:
+            # true where valid
+            pasture_mask, _, _ = raster_geometry_mask(ds, features)
+
+            head, tail = _split(dst_fn)
+            utm_dst_fn = _join(head, tail.replace('.tif', '.utm.tif'))
+            dst_vrt_fn = _join(head, tail.replace('.tif', '.wgs.vrt'))
+            dst_wgs_fn = _join(head, tail.replace('.tif', '.wgs.tif'))
+
+
+            with rasterio.Env():
+                profile = ds.profile
+                dtype = rasterio.uint8
+                profile.update(
+                    count=1,
+                    dtype=rasterio.uint8,
+                    nodata=nodata,
+                    compress='lzw')
+
+                with rasterio.open(utm_dst_fn, 'w', **profile) as dst:
+                    dst.write(pasture_mask.astype(dtype), 1)
+
+            assert _exists(utm_dst_fn)
+        except:
+            raise
+
+        try:
+
+            if _exists(dst_vrt_fn):
+                os.remove(dst_vrt_fn)
+
+            cmd = ['gdalwarp', '-t_srs', 'EPSG:4326', '-of', 'vrt', utm_dst_fn, dst_vrt_fn]
+            p = Popen(cmd)
+            p.wait()
+
+            assert _exists(dst_vrt_fn)
+        except:
+            if _exists(dst_vrt_fn):
+                os.remove(dst_vrt_fn)
+            raise
+
+        try:
+            if _exists(dst_fn):
+                os.remove(dst_fn)
+
+            cmd = ['gdal_translate', '-co', 'COMPRESS=LZW', '-of', 'GTiff', dst_vrt_fn, dst_wgs_fn]
+            p = Popen(cmd)
+            p.wait()
+
+            assert _exists(dst_wgs_fn)
+        except:
+            if _exists(dst_wgs_fn):
+                os.remove(dst_wgs_fn)
+            raise
+
+        if _exists(dst_vrt_fn):
+            os.remove(dst_vrt_fn)
+
+    def mask_ranch_opt(self, raster_fn, ranch, dst_fn, nodata=-9999, crop=False):
+
+        assert _exists(_split(dst_fn)[0])
+        assert dst_fn.endswith('.tif')
+
+        ds = rasterio.open(raster_fn)
+        ds_proj4 = ds.crs.to_proj4()
+        prj = ('utm', 'wgs')[ds.crs.is_geographic]
+
+        mask_dir = self.mask_dir
+        mask_fn = _join(self.mask_dir, f'{ranch}.{prj}.tif')
+
+        ms = rasterio.open(mask_fn)
+
+        # true where valid
+        pasture_mask = ms.read(1, masked=True)
+        data = np.ma.array(ds.read(1, masked=True), mask=pasture_mask)
+        if not crop:
+            if isinstance(data, np.ma.core.MaskedArray):
+                data.fill_value = nodata
+                _data = data.filled()
+            else:
+                _data = data
+
+            with rasterio.Env():
+                profile = ds.profile
+                dtype = profile.get('dtype')
+                profile.update(
+                    count=1,
+                    nodata=nodata,
+                    compress='lzw')
+
+            with rasterio.open(dst_fn, 'w', **profile) as dst:
+                dst.write(_data.astype(dtype), 1)
+        else:
+            not_pasture_mask = np.logical_not(pasture_mask)
+            rows = np.any(not_pasture_mask, axis=1)
+            cols = np.any(not_pasture_mask, axis=0)
+            rmin, rmax = np.where(rows)[0][[0, -1]]
+            cmin, cmax = np.where(cols)[0][[0, -1]]
+
+            data = data[rmin:rmax, cmin:cmax]
+            if isinstance(data, np.ma.core.MaskedArray):
+                data.fill_value = nodata
+                _data = data.filled()
+            else:
+                _data = data
+
+            #trans = rasteriio.Affine.translation(,0)
+            out_transform = rasterio.Affine(ds.transform.a, 
+                                            ds.transform.b, 
+                                            ds.transform.c + cmin * ds.transform.a, 
+                                            ds.transform.d, 
+                                            ds.transform.e, 
+                                            ds.transform.f + rmin * ds.transform.e) 
+
+            with rasterio.Env():
+                profile = ds.profile
+                dtype = profile.get('dtype')
+                profile.update(
+                    count=1,
+                    width=cmax-cmin,
+                    height=rmax-rmin,
+                    transform=out_transform,
+                    nodata=nodata,
+                    compress='lzw')
+
+            with rasterio.open(dst_fn, 'w', **profile) as dst:
+                dst.write(_data.astype(dtype), 1)
+
+        assert _exists(dst_fn)
+
+        return dst_fn
 
     def mask_ranches(self, raster_fn, ranches, dst_fn, nodata=-9999):
         """
@@ -286,12 +682,17 @@ class Location(object):
         sf_fn = os.path.abspath(sf_fn)
         sf = fiona.open(sf_fn, 'r')
 
+        reverse_key = self.reverse_key
+
         features = []
         for feature in sf:
             properties = feature['properties']
             key = properties[sf_feature_properties_key].replace(' ', '_')
 
-            _pasture, _ranch = key.split(self.key_delimiter)
+            if not reverse_key:
+                _pasture, _ranch = key.split(self.key_delimiter)
+            else:
+                _ranch, _pasture = key.split(self.key_delimiter)
 
             if any(_ranch.lower() == r.lower() for r in ranches):
                 _features = transform_geom(sf.crs_wkt, ds_proj4, feature['geometry'])
@@ -386,6 +787,8 @@ class Location(object):
             key = properties[sf_feature_properties_key].replace(' ', '_')
 
             _pasture, _ranch = key.split(self.key_delimiter)
+            if self.reverse_key:
+                _ranch, _pasture = _pasture, _ranch
 
             if ranch is None or _ranch.lower() == ranch.lower():
                 bboxs.append(fiona.bounds(feature))
@@ -445,6 +848,8 @@ class Location(object):
             key = properties[sf_feature_properties_key].replace(' ', '_')
 
             _pasture, _ranch = key.split(self.key_delimiter)
+            if self.reverse_key:
+                _ranch, _pasture = _pasture, _ranch
 
             if _pasture.lower() == pasture.lower() and _ranch.lower() == ranch.lower():
                 properties = feature['properties']
@@ -514,6 +919,10 @@ class Location(object):
         for f in js['features']:
             key = f['properties'][sf_feature_properties_key].replace(' ', '_')
             _pasture, _ranch = key.split(self.key_delimiter)
+            # Don't reverse here, because the shape file should already have pasture+ranch keys
+            #
+#            if self.reverse_key:
+#                _ranch, _pasture = _pasture, _ranch
 
 
             if (ranch is None or _ranch.lower() == ranch.lower()) and \

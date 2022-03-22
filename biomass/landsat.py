@@ -292,6 +292,16 @@ class LandSatScene(object):
             return self.swir_ratio
         elif indexname.lower() == 'aerosol':
             return self.aerosol
+        elif indexname.lower() == 'nir':
+            return self.nir
+        elif indexname.lower() == 'red':
+            return self.red
+        elif indexname.lower() == 'green':
+            return self.green
+        elif indexname.lower() == 'blue':
+            return self.blue
+        elif indexname.lower() == 'rgb':
+            return self.rgb
 
         raise KeyError(indexname)
 

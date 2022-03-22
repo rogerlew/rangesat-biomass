@@ -6,6 +6,8 @@ from os.path import split as _split
 from os.path import isdir, exists
 
 from flask import Flask, jsonify, send_file, request, after_this_request
+from flask_caching import Cache
+
 from glob import glob
 from datetime import datetime
 import os
@@ -63,6 +65,8 @@ from biomass.raster_processing import (
 )
 
 app = Flask(__name__)
+
+cache = Cache(app, config={'CACHE_TYPE': 'SimpleCache'}) 
 
 _thisdir = os.path.dirname(__file__)
 STATIC_DIR = _join(_thisdir, 'static')
@@ -185,6 +189,7 @@ def pasture(location, ranch, pasture):
 
 @app.route('/geojson/<location>')
 @app.route('/geojson/<location>/')
+@cache.cached(timeout=3600*24*30)
 def geojson_location(location):
     try:
         for rangesat_dir in RANGESAT_DIRS:
@@ -201,6 +206,7 @@ def geojson_location(location):
 
 @app.route('/geojson/<location>/<ranch>')
 @app.route('/geojson/<location>/<ranch>/')
+@cache.cached(timeout=3600*24*30)
 def geojson_ranch(location, ranch):
     try:
         for rangesat_dir in RANGESAT_DIRS:
@@ -217,6 +223,7 @@ def geojson_ranch(location, ranch):
 
 @app.route('/geojson/<location>/<ranch>/<pasture>')
 @app.route('/geojson/<location>/<ranch>/<pasture>/')
+@cache.cached(timeout=3600*24*30)
 def geojson_pasture(location, ranch, pasture):
     try:
         for rangesat_dir in RANGESAT_DIRS:
@@ -240,6 +247,7 @@ def geojson_pasture(location, ranch, pasture):
 
 @app.route('/scenemeta/<location>')
 @app.route('/scenemeta/<location>/')
+@cache.cached(timeout=3600*24*30, query_string=True)
 def scenemeta_location(location):
     try:
         filter = request.args.get('filter', None)
@@ -296,6 +304,7 @@ def scenemeta_location(location):
 
 @app.route('/scenemeta/<location>/<product_id>')
 @app.route('/scenemeta/<location>/<product_id>/')
+@cache.cached(timeout=3600*24*30, query_string=True)
 def scenemeta_location_product_id(location, product_id):
     try:
 
@@ -323,15 +332,15 @@ def scenemeta_location_product_id(location, product_id):
         return exception_factory()
 
 
-def dump_measure(ls_dir, product):
+def dump_measure(ls_dir, product, scale=None):
     ls = LandSatScene(ls_dir)
     data = ls.get_index(product)
     dst_fn = _join(ls_dir, f'{product}.tif')
     ls.dump(data, _join(ls_dir, dst_fn))
-    reproject_raster_to_wgs(dst_fn)
+    reproject_raster_to_wgs(dst_fn, scale=scale)
 
 
-def reproject_raster_to_wgs(src):
+def reproject_raster_to_wgs(src, scale=None):
     dst = src[:-4] + '.wgs.vrt'
     dst2 = src[:-4] + '.wgs.tif'
 
@@ -344,10 +353,13 @@ def reproject_raster_to_wgs(src):
     p = Popen(cmd)
     p.wait()
 
-    cmd = ['gdal_translate', '-co', 'COMPRESS=LZW', '-of', 'GTiff', dst, dst2]
+    cmd = ['gdal_translate', '-co', 'COMPRESS=LZW', '-of', 'GTiff']
+    if scale is not None:
+        cmd += ['-ot', 'Int16', '-scale'] + [str(v) for v in scale]
+    cmd += [dst, dst2]
     p = Popen(cmd)
     p.wait()
-    assert _exists(dst)
+    assert exists(dst)
 
 
 @app.route('/raster/<location>/<product_id>/<product>')
@@ -392,10 +404,18 @@ def raster(location, product_id, product):
                         
                     
                 if len(fn) > 1:
-                    fn = [f for f in fn if 'T1_ndvi' in f]
+                    fn = [f for f in fn if 'sr_ndvi' in f]
 
                 if len(fn) != 1:
-                    return jsonify(None)
+                    if product == 'ndvi' and 'rangesat.org' in request.referrer:
+                        dump_measure(_join(out_dir, product_id), product, [-1, 1, -10000, 10000])
+                    else:
+                        dump_measure(_join(out_dir, product_id), product)
+
+                    if utm:
+                        fn = glob(_join(out_dir, product_id, '*{}.tif'.format(product)))
+                    else:
+                        fn = glob(_join(out_dir, product_id, '*{}.wgs.tif'.format(product)))
 
                 fn = fn[0]
 
@@ -409,10 +429,11 @@ def raster(location, product_id, product):
 
                 ranches = literal_eval(ranches)
 
-                assert exists(fn.replace('.wgs.tif', '.tif'))
-
                 file_path = os.path.abspath(_join(SCRATCH, file_name))
-                _location.mask_ranches(fn.replace('.wgs.tif', '.tif'), ranches, file_path)
+                try:
+                    _location.mask_ranch_opt(fn, ranches[0], file_path, crop=True)
+                except:
+                    _location.mask_ranches(fn, ranches, file_path)
 
                 @after_this_request
                 def remove_file(response):
@@ -732,6 +753,7 @@ def interyear_rasterprocessing(location, product):
 
 @app.route('/pasturestats/difference/<location>/<product>')
 @app.route('/pasturestats/difference/<location>/<product>/')
+@cache.cached(timeout=3600*24*30, query_string=True)
 def pasturestats_difference(location, product):
     try:
         ranches = request.args.get('ranches', None)
@@ -1118,6 +1140,7 @@ def _date_validator(date_str):
 
 @app.route('/pasturestats/single-year/<location>')
 @app.route('/pasturestats/single-year/<location>/')
+@cache.cached(timeout=3600*24*30, query_string=True)
 def singleyear_pasturestats(location):
     """
     https://rangesat.org/api/pasturestats/single-year/Zumwalt/?ranch=TNC&pasture=A1&year=2018&csv=True
@@ -1176,6 +1199,7 @@ def singleyear_pasturestats(location):
 
 @app.route('/pasturestats/intra-year/<location>')
 @app.route('/pasturestats/intra-year/<location>/')
+@cache.cached(timeout=3600*24*30, query_string=True)
 def intrayear_pasturestats(location):
     """
     https://rangesat.org/api/pasturestats/intra-year/Zumwalt/?ranch=TNC&pasture=A1&year=2018&csv=True
@@ -1233,6 +1257,7 @@ def intrayear_pasturestats(location):
 
 @app.route('/pasturestats/max-pasture-seasonal/<location>')
 @app.route('/pasturestats/max-pasture-seasonal/<location>/')
+@cache.cached(timeout=3600*24*30, query_string=True)
 def max_seasonal_pasturestats(location):
     """
     https://rangesat.org/api/pasturestats/max-pasture-seasonal/Zumwalt/?ranch=TNC&pasture=A1&year=2019&csv=True
@@ -1279,8 +1304,8 @@ def max_seasonal_pasturestats(location):
                 db_fn = _location.db_fn
 
                 data = query_max_pasture_seasonal_pasture_stats(db_fn, ranch=ranch, pasture=pasture, year=year,
-                                                     start_date=start_date, end_date=end_date, measure=measure,
-                                                     key_delimiter=_location.key_delimiter)
+                                                                start_date=start_date, end_date=end_date, measure=measure,
+                                                                key_delimiter=_location.key_delimiter)
                 return _handle_pasturestat_request(data, csv, units=units, drop=drop, additions=additions)
 
         return jsonify(None)
@@ -1291,6 +1316,7 @@ def max_seasonal_pasturestats(location):
 
 @app.route('/pasturestats/single-year-monthly/<location>')
 @app.route('/pasturestats/single-year-monthly/<location>/')
+@cache.cached(timeout=3600*24*30, query_string=True)
 def singleyearmonthly_pasturestats(location):
     """
     TODO: weight ranch pasturestats by area
@@ -1334,6 +1360,7 @@ def singleyearmonthly_pasturestats(location):
                 data = query_singleyearmonthly_pasture_stats(db_fn, ranch=ranch, pasture=pasture, year=year,
                                                              agg_func=agg_func,
                                                              key_delimiter=_location.key_delimiter)
+
                 return _handle_pasturestat_request(data, csv, units=units, drop=drop, additions=additions)
 
         return jsonify(None)
@@ -1344,6 +1371,7 @@ def singleyearmonthly_pasturestats(location):
 
 @app.route('/ranchstats/single-year-monthly/<location>')
 @app.route('/ranchstats/single-year-monthly/<location>/')
+@cache.cached(timeout=3600*24*30, query_string=True)
 def singleyearmonthly_ranchstats(location):
     """
     TODO: weight ranch pasturestats by area
@@ -1382,8 +1410,8 @@ def singleyearmonthly_ranchstats(location):
                 db_fn = _location.db_fn
 
                 data = query_singleyearmonthly_ranch_stats(db_fn, ranch=ranch, year=year,
-                                                             agg_func=agg_func,
-                                                             key_delimiter=_location.key_delimiter)
+                                                           agg_func=agg_func,
+                                                           key_delimiter=_location.key_delimiter)
                 return _handle_pasturestat_request(data, csv, units=units, drop=drop, additions=additions)
 
         return jsonify(None)
@@ -1394,6 +1422,7 @@ def singleyearmonthly_ranchstats(location):
 
 @app.route('/pasturestats/seasonal-progression/<location>')
 @app.route('/pasturestats/seasonal-progression/<location>/')
+@cache.cached(timeout=3600*24*30, query_string=True)
 def seasonalprogression_pasturestats(location):
     """
     https://rangesat.org/api/pasturestats/seasonal-progression/Zumwalt/?ranch=TNC&pasture=A1&start_year=2000&end_year=2019&csv=True
@@ -1448,6 +1477,7 @@ def seasonalprogression_pasturestats(location):
 
 @app.route('/ranchstats/seasonal-progression/<location>')
 @app.route('/ranchstats/seasonal-progression/<location>/')
+@cache.cached(timeout=3600*24*30, query_string=True)
 def seasonalprogression_ranchstats(location):
     """
     https://rangesat.org/api/ranchstats/seasonal-progression/Zumwalt/?ranch=TNC&pasture=A1&start_year=2000&end_year=2019&csv=True
@@ -1501,6 +1531,7 @@ def seasonalprogression_ranchstats(location):
 
 @app.route('/pasturestats/inter-year/<location>')
 @app.route('/pasturestats/inter-year/<location>/')
+@cache.cached(timeout=3600*24*30, query_string=True)
 def interyear_pasturestats(location):
     """
     https://rangesat.org/api/pasturestats/inter-year/Zumwalt/?ranch=TNC&pasture=A1&start_year=2000&end_year=2019&csv=True
@@ -1567,6 +1598,7 @@ def interyear_pasturestats(location):
 
 @app.route('/pasturestats/multi-year/<location>')
 @app.route('/pasturestats/multi-year/<location>/')
+@cache.cached(timeout=3600*24*30, query_string=True)
 def multiyear_pasturestats(location):
     """
     https://rangesat.org/api/pasturestats/multi-year/Zumwalt/?ranch=TNC&pasture=A1&start_year=2000&end_year=2019&csv=True
@@ -1643,6 +1675,7 @@ def multiyear_pasturestats(location):
 
 @app.route('/ranchstats/multi-year/<location>')
 @app.route('/ranchstats/multi-year/<location>/')
+@cache.cached(timeout=3600*24*30, query_string=True)
 def multiyear_ranchstats(location):
     """
     https://rangesat.org/api/ranchstats/multi-year/Zumwalt/?ranch=TNC&start_year=2000&end_year=2019&csv=True
@@ -1848,6 +1881,7 @@ def _handle_gridmet_multiyear_request(ddata, csv, units):
 @app.route('/gridmet/multi-year/<location>/<ranch>/')
 @app.route('/gridmet/multi-year/<location>/<ranch>/<pasture>')
 @app.route('/gridmet/multi-year/<location>/<ranch>/<pasture>/')
+@cache.cached(timeout=3600*24*30, query_string=True)
 def gridmet_allyears_pasture(location, ranch, pasture=None):
     try:
         start_year = request.args.get('start_year', None)
@@ -1890,6 +1924,7 @@ def gridmet_allyears_pasture(location, ranch, pasture=None):
 @app.route('/gridmet/single-year/<location>/<ranch>/')
 @app.route('/gridmet/single-year/<location>/<ranch>/<pasture>')
 @app.route('/gridmet/single-year/<location>/<ranch>/<pasture>/')
+@cache.cached(timeout=3600*24*30, query_string=True)
 def gridmet_singleyear_pasture(location, ranch, pasture=None):
     try:
         year = request.args.get('year', datetime.now().year)
@@ -1932,6 +1967,7 @@ def gridmet_singleyear_pasture(location, ranch, pasture=None):
 @app.route('/gridmet/single-year-monthly/<location>/<ranch>/')
 @app.route('/gridmet/single-year-monthly/<location>/<ranch>/<pasture>')
 @app.route('/gridmet/single-year-monthly/<location>/<ranch>/<pasture>/')
+@cache.cached(timeout=3600*24*30, query_string=True)
 def gridmet_singleyearmonthly_pasture(location, ranch, pasture=None):
     try:
         year = request.args.get('year', datetime.now().year)
@@ -1973,6 +2009,7 @@ def gridmet_singleyearmonthly_pasture(location, ranch, pasture=None):
 @app.route('/gridmet/annual-progression/<location>/<ranch>/')
 @app.route('/gridmet/annual-progression/<location>/<ranch>/<pasture>')
 @app.route('/gridmet/annual-progression/<location>/<ranch>/<pasture>/')
+@cache.cached(timeout=3600*24*30, query_string=True)
 def gridmet_annualprogression_pasture(location, ranch, pasture=None):
     try:
         start_year = request.args.get('start_year', None)
@@ -2014,6 +2051,7 @@ def gridmet_annualprogression_pasture(location, ranch, pasture=None):
 @app.route('/gridmet/annual-progression-monthly/<location>/<ranch>/')
 @app.route('/gridmet/annual-progression-monthly/<location>/<ranch>/<pasture>')
 @app.route('/gridmet/annual-progression-monthly/<location>/<ranch>/<pasture>/')
+@cache.cached(timeout=3600*24*30, query_string=True)
 def gridmet_annualprogression_monthly_pasture(location, ranch, pasture=None):
     try:
         start_year = request.args.get('start_year', None)
@@ -2055,6 +2093,7 @@ def gridmet_annualprogression_monthly_pasture(location, ranch, pasture=None):
 @app.route('/histogram/single-scene-bypasture/<location>/')
 @app.route('/histogram/single-scene-bypasture/<location>/<ranch>')
 @app.route('/histogram/single-scene-bypasture/<location>/<ranch>/')
+@cache.cached(timeout=3600*24*30, query_string=True)
 def histogram_singlescene_bypasture(location, ranch=None):
     try:
         product_id = request.args.get('product_id', scenemeta_location_latest(location))
@@ -2081,8 +2120,12 @@ def histogram_singlescene_bypasture(location, ranch=None):
                     return jsonify({'Error': 'Product ID/Product not found'})
                 fn = fn[0]
 
-                data = _location.extract_pixels_by_pasture(fn, ranch)
 
+                try:
+                    data = _location.extract_pixels_by_pasture_opt(fn, ranch)
+                except:
+                    data = _location.extract_pixels_by_pasture(fn, ranch)
+                   
                 for key in data:
                     _ranch, _pasture = key
                     _data, _total_px = data[key]
@@ -2108,6 +2151,7 @@ def histogram_singlescene_bypasture(location, ranch=None):
 @app.route('/histogram/single-scene/<location>/<ranch>/')
 @app.route('/histogram/single-scene/<location>/<ranch>/<pasture>')
 @app.route('/histogram/single-scene/<location>/<ranch>/<pasture>/')
+@cache.cached(timeout=3600*24*30, query_string=True)
 def histogram_singlescene_pasture(location, ranch=None, pasture=None):
     try:
         product_id = request.args.get('product_id', scenemeta_location_latest(location))
@@ -2133,7 +2177,11 @@ def histogram_singlescene_pasture(location, ranch=None, pasture=None):
                     return jsonify({'Error': 'Product ID/Product not found'})
                 fn = fn[0]
 
-                data, total_px = _location.extract_pixels(fn, ranch, pasture)
+                try:
+                    data, total_px = _location.extract_pixels_opt(fn, ranch, pasture)
+                except:
+                    data, total_px = _location.extract_pixels(fn, ranch, pasture)
+
                 counts, bins = np.histogram(data, bins=_bins)
                 _masked = total_px - int(np.sum(counts))
                 counts = [int(x) for x in counts]
@@ -2158,6 +2206,7 @@ def histogram_singlescene_pasture(location, ranch=None, pasture=None):
 @app.route('/histogram/intra-year/<location>/<ranch>/')
 @app.route('/histogram/intra-year/<location>/<ranch>/<pasture>')
 @app.route('/histogram/intra-year/<location>/<ranch>/<pasture>/')
+@cache.cached(timeout=3600*24*30, query_string=True)
 def intrayear_histogram(location, ranch, pasture=None):
     try:
         year = request.args.get('year', None)
@@ -2191,7 +2240,11 @@ def intrayear_histogram(location, ranch, pasture=None):
                         return jsonify({'Error': 'Product ID/Product not found'})
                     fn = fn[0]
 
-                    _data, _total_px = _location.extract_pixels(fn, ranch, pasture)
+                    try:
+                        data, total_px = _location.extract_pixels_opt(fn, ranch, pasture)
+                    except:
+                        data, total_px = _location.extract_pixels(fn, ranch, pasture)
+
                     data.append(_data)
                     total_px += _total_px
 
@@ -2217,6 +2270,7 @@ def intrayear_histogram(location, ranch, pasture=None):
 @app.route('/histogram/inter-year/<location>/<ranch>/')
 @app.route('/histogram/inter-year/<location>/<ranch>/<pasture>')
 @app.route('/histogram/inter-year/<location>/<ranch>/<pasture>/')
+@cache.cached(timeout=3600*24*30, query_string=True)
 def interyear_histogram(location, ranch, pasture=None):
     try:
         start_year = request.args.get('start_year', None)

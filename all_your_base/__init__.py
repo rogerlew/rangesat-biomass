@@ -1,6 +1,9 @@
 from os.path import exists
 from os.path import join as _join
 
+from subprocess import check_output
+import json
+
 import fiona
 import pyproj
 
@@ -39,6 +42,24 @@ def wkt_2_proj4(wkt):
 
 
 wgs84_proj4 = '+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs'
+
+
+def rat_extract(fn):
+    """extract raster attribute table from geotiff"""
+
+    js = check_output('gdalinfo -json ' + fn, shell=True)
+    rat = json.loads(js.decode())['rat']
+
+    field_defs = rat['fieldDefn']
+
+    d = {}
+    for row in rat['row']:
+        row = row['f']
+        px_value = row[0]
+        row = {fd['name']: v for fd, v in zip(field_defs, row)}
+        d[px_value] = row
+
+    return d
 
 
 def get_sf_wgs_bounds(_sf_fn):
