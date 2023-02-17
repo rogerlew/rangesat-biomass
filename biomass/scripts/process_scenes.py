@@ -82,7 +82,9 @@ sf_fn = os.path.abspath(sf_fn)
 sf = fiona.open(sf_fn, 'r')
 bbox = get_sf_wgs_bounds(sf_fn)
 
+#landsat_scene_directory = _join(_d['landsat_scene_directory'], 'collection2')
 landsat_scene_directory = _d['landsat_scene_directory']
+
 wrs_blacklist = _d.get('wrs_blacklist', None)
 wrs_whitelist = _d.get('wrs_whitelist', None)
 years = _d.get('years', None)
@@ -102,7 +104,8 @@ if __name__ == '__main__':
 #    os.makedirs(out_dir)
 
     # find all the scenes
-    fns = glob(_join(landsat_scene_directory, '*2021*-*.tar.gz'))
+    fns = glob(_join(landsat_scene_directory, '*198*-*.tar.gz'))
+#    fns = glob(_join(landsat_scene_directory, '*.tar'))
 
 #    print(landsat_scene_directory, fns)
 
@@ -153,3 +156,4 @@ if __name__ == '__main__':
 
     sf.close()
     print('processed %i scenes in %f seconds' % (len(fns), time() - t0))
+

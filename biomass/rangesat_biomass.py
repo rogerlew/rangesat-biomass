@@ -15,8 +15,18 @@ from rasterio.mask import raster_geometry_mask
 
 from fiona.transform import transform_geom
 
+from pprint import pprint
+
 import numpy as np
 from .landsat import LandSatScene
+
+
+def isfloat(x):
+    try:
+        float(x)
+        return True
+    except:
+        return False
 
 
 def _quantile(a, q):
@@ -236,7 +246,22 @@ class BiomassModel(object):
         :param sf:
         :return:
         """
-        
+
+        def is_mappable_of_floats(x):
+            try:
+                float(x[0])
+                return True
+            except:
+                return False
+
+        def coords_3d_to_2d(coords):
+            _coords = []
+            for coord in coords:
+                if is_mappable_of_floats(coord):
+                    _coords.append((coord[0], coord[1]))
+                else:
+                    _coords.append(coords_3d_to_2d(coord))
+            return _coords 
 
         ls = self.ls
         sat = self.ls.satellite
@@ -257,7 +282,15 @@ class BiomassModel(object):
             key = feature['properties'][sf_feature_properties_key]
             features = [transform_geom(sf.crs_wkt, ls.proj4, feature['geometry'])]
 
-            # true where valid
+            features = [
+		    {
+			"type": g["type"],
+			"coordinates": coords_3d_to_2d(g["coordinates"]),
+		    }
+		    for g in features
+		]
+
+
             pasture_mask, _, _ = raster_geometry_mask(ls.template_ds, features)
             not_pasture_mask = np.logical_not(pasture_mask)
 
@@ -307,7 +340,7 @@ class BiomassModel(object):
                     # determine the 10th, 75th and 90th percentiles of the distribution
                     percentiles = _quantile(pasture_biomass, [0.1, 0.5, 0.75, 0.9])
                     d.biomass_10pct_gpm = percentiles[0]
-                    d.biomass_10pct_gpm = percentiles[1]
+                    d.biomass_50pct_gpm = percentiles[1]
                     d.biomass_75pct_gpm = percentiles[2]
                     d.biomass_90pct_gpm = percentiles[3]
 

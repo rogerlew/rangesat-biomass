@@ -28,9 +28,11 @@ from rasterio.warp import transform_bounds
 
 def get_gz_scene_bounds(fn):
     assert _exists(fn), fn
-    assert fn.endswith('.tar.gz')
-
-    tf = tarfile.open(fn, 'r|gz')
+    
+    if fn.endswith('.tar.gz'):
+        tf = tarfile.open(fn, 'r|gz')
+    else:
+        tf = tarfile.open(fn, 'r')
 
     member = tf.next()
 
@@ -67,6 +69,9 @@ class LandSatScene(object):
             self.basedir = None
             self.tar_fn = fn
 
+        tail, head = _split(fn)
+        self._l2sp = '_l2sp_' in head.lower()
+
         self._build_bqa()
 
     def __open_dir(self, fn):
@@ -83,14 +88,6 @@ class LandSatScene(object):
             key = _split(fn)[-1].replace('%s_' % product_id, '') \
                                 .lower() \
                                 .replace('.tif', '') \
-                                .replace('qa_pixel', 'pixel_qa') \
-                                .replace('sr_b1', 'sr_band1') \
-                                .replace('sr_b2', 'sr_band2') \
-                                .replace('sr_b3', 'sr_band3') \
-                                .replace('sr_b4', 'sr_band4') \
-                                .replace('sr_b5', 'sr_band5') \
-                                .replace('sr_b6', 'sr_band6') \
-                                .replace('sr_b7', 'sr_band7') \
                                
             if fn.lower().endswith('.xml'):
                 with open(fn, 'r') as fp:
@@ -115,7 +112,7 @@ class LandSatScene(object):
                 pass
 
     def __open_targz(self, fn):
-        assert fn.endswith('.tar.gz')
+        assert fn.endswith('.tar.gz') or fn.endswith('.tar')
 
         # Open tarfile
         tar = tarfile.open(fn)
@@ -147,6 +144,10 @@ class LandSatScene(object):
 #        if self.tar is not None:
 #            self.tar.close()
 
+    @property
+    def l2sp(self):
+        return self._l2sp
+
     def get_dataset(self, name):
         if name not in self._d:
             raise KeyError
@@ -163,15 +164,23 @@ class LandSatScene(object):
         # the 9th and 10th bits are used to encode the cirrus confidence. This ends up
         # dropping those bits for the sake of performance
 
-        # ds = self.get_dataset('pixel_qa')
-        pixel_qa = np.array(self._d['pixel_qa'].read(1), dtype=np.uint16)
-        m, n = pixel_qa.shape
-        bqa = np.unpackbits(pixel_qa.view(np.uint8)).reshape((m, n, 16))
-        self.bqa = np.concatenate((bqa[:, :, 8:], bqa[:, :, :8]), axis=2)
+
+        if self.l2sp:
+            # ds = self.get_dataset('pixel_qa')
+            pixel_qa = np.array(self._d['qa_pixel'].read(1), dtype=np.uint16)
+            m, n = pixel_qa.shape
+            self.bqa = np.unpackbits(pixel_qa.view(np.uint8)).reshape((m, n, 16))
+            # self.bqa = np.concatenate((bqa[:, :, 8], bqa[:, :, :8]), axis=2)
+        else:
+            # ds = self.get_dataset('pixel_qa')
+            pixel_qa = np.array(self._d['pixel_qa'].read(1), dtype=np.uint16)
+            m, n = pixel_qa.shape
+            bqa = np.unpackbits(pixel_qa.view(np.uint8)).reshape((m, n, 16))
+            self.bqa = np.concatenate((bqa[:, :, 8:], bqa[:, :, :8]), axis=2)
 
     @property
     def cellsize(self):
-        gt = self._d['pixel_qa'].transform
+        gt = self._d[self.default_key].transform
         px_x = gt[0]
         px_y = -gt[4]
 
@@ -196,24 +205,31 @@ class LandSatScene(object):
         return self.product_id.split('_')[1]
 
     @property
+    def default_key(self):
+        if self.l2sp:
+            return 'qa_pixel'
+        else:
+            return 'pixel_qa'
+
+    @property
     def wrs(self):
         wrs = self.product_id.split('_')[2]
         return int(wrs[:3]), int(wrs[3:])
 
     @property
     def bounds(self):
-        src = self._d['pixel_qa']
+        src = self._d[self.default_key]
         bounds = src.bounds
         return [bounds.left, bounds.bottom, bounds.right, bounds.top]
 
     @property
     def proj4(self):
-        src = self._d['pixel_qa']
+        src = self._d[self.default_key]
         return src.crs.to_proj4()
 
     @property
     def wgs_bounds(self):
-        src = self._d['pixel_qa']
+        src = self._d[self.default_key]
         return transform_bounds(src.crs, 'EPSG:4326', *src.bounds)
 
     @property
@@ -312,7 +328,10 @@ class LandSatScene(object):
 
     @property
     def qa_fill(self):
-        return self.bqa[:, :, 15-0]
+        if self.l2sp:
+            return self.bqa[:, :, 0]
+        else:
+            return self.bqa[:, :, 15-0]
 
     @property
     def qa_notclear(self):
@@ -321,38 +340,64 @@ class LandSatScene(object):
 
     @property
     def qa_clear(self):
-        return self.bqa[:, :, 15-1]
+        if self.l2sp:
+            return self.bqa[:, :, 6]
+        else:
+            return self.bqa[:, :, 15-1]
 
     @property
     def qa_water(self):
-        return self.bqa[:, :, 15-2]
+        if self.l2sp:
+            return self.bqa[:, :, 7]
+        else:
+            return self.bqa[:, :, 15-2]
 
     @property
     def qa_cloud_shadow(self):
-        return self.bqa[:, :, 15-3]
+        if self.l2sp:
+            return self.bqa[:, :, 4]
+        else:
+            return self.bqa[:, :, 15-3]
 
     @property
     def qa_snow(self):
-        return self.bqa[:, :, 15-4]
+        if self.l2sp:
+            return self.bqa[:, :, 5]
+        else:
+            return self.bqa[:, :, 15-4]
 
     @property
     def qa_cloud(self):
-        return self.bqa[:, :, 15-5]
+        if self.l2sp:
+            return self.bqa[:, :, 3]
+        else:
+            return self.bqa[:, :, 15-5]
 
     @property
     def qa_cloud_confidence(self):
-        return self.bqa[:, :, 15-6] + 2.0 * self.bqa[:, :, 15-7]
+        if self.l2sp:
+            return self.bqa[:, :, 9] + 2.0 * self.bqa[:, :, 8]
+        else:
+            return self.bqa[:, :, 15-6] + 2.0 * self.bqa[:, :, 15-7]
 
     @property
     def qa_cirrus_confidence(self):
-        return self.bqa[:, :, 15-8] + 2.0 * self.bqa[:, :, 15-9]
+        if self.l2sp:
+            return self.bqa[:, :, 15] + 2.0 * self.bqa[:, :, 14]
+        else:
+            return self.bqa[:, :, 15-8] + 2.0 * self.bqa[:, :, 15-9]
 
     @property
     def aerosol(self):
-        if self.satellite == 8:
-            return self._d['sr_aerosol'].read(1, masked=True)
+        if self.l2sp:
+            assert self.satellite in [8, 9], self.satellite
+            return self._d['sr_qa_aerosol'].read(1, masked=True)
+
         else:
-            return self._d['sr_atmos_opacity'].read(1, masked=True)
+            if self.satellite == 8:
+                return self._d['sr_aerosol'].read(1, masked=True)
+            else:
+                return self._d['sr_atmos_opacity'].read(1, masked=True)
 
     def threshold_aerosol(self, threshold=101, mask=None):
         aero = self.aerosol
@@ -365,7 +410,14 @@ class LandSatScene(object):
         return mask
 
     def _band_proc(self, measure):
-        return np.abs(self._d[measure].read(1, masked=True))
+        if self.l2sp:
+            data = self._d[measure].read(1, masked=True)
+            print(np.min(data), np.max(data))
+            data = np.ma.masked_less(data, 7273)
+            data = np.ma.masked_greater(data, 43636)
+            return data * 0.0000275 - 0.2
+        else:
+            return np.abs(self._d[measure].read(1, masked=True))
 
     def _tasseled_cap_greenness__5(self):
         return -0.1603 * self._band_proc('sr_band1') + \
@@ -390,6 +442,14 @@ class LandSatScene(object):
                 0.7276 * self._band_proc('sr_band5') + \
                 0.0713 * self._band_proc('sr_band6') + \
                -0.1608 * self._band_proc('sr_band7')
+
+    def _tasseled_cap_greenness__l2sp(self):
+        return -0.2941 * self._band_proc('sr_b2') + \
+               -0.2430 * self._band_proc('sr_b3') + \
+               -0.5424 * self._band_proc('sr_b4') + \
+                0.7276 * self._band_proc('sr_b5') + \
+                0.0713 * self._band_proc('sr_b6') + \
+               -0.1608 * self._band_proc('sr_b7')
 
     @property
     def tasseled_cap_greenness(self):
@@ -420,11 +480,15 @@ class LandSatScene(object):
 
     @property
     def ultra_blue(self):
+        if self.l2sp:
+            return self._band_proc('sr_b1')
         if self.satellite == 8:
             return self._band_proc('sr_band1')
 
     @property
     def blue(self):
+        if self.l2sp:
+            return self._band_proc('sr_b2')
         if self.satellite == 8:
             return self._band_proc('sr_band2')
         elif self.satellite == 7:
@@ -434,6 +498,8 @@ class LandSatScene(object):
 
     @property
     def green(self):
+        if self.l2sp:
+            return self._band_proc('sr_b3')
         if self.satellite == 8:
             return self._band_proc('sr_band3')
         elif self.satellite == 7:
@@ -443,6 +509,8 @@ class LandSatScene(object):
 
     @property
     def red(self):
+        if self.l2sp:
+            return self._band_proc('sr_b4')
         if self.satellite == 8:
             return self._band_proc('sr_band4')
         elif self.satellite == 7:
@@ -453,6 +521,8 @@ class LandSatScene(object):
 
     @property
     def nir(self):
+        if self.l2sp:
+            return self._band_proc('sr_b5')
         if self.satellite == 8:
             return self._band_proc('sr_band5')
         elif self.satellite == 7:
@@ -526,6 +596,8 @@ class LandSatScene(object):
 
     @property
     def swir1(self):
+        if self.l2sp:
+            return self._band_proc('sr_b6')
         if self.satellite == 8:
             return self._band_proc('sr_band6')
         elif self.satellite == 7:
@@ -535,6 +607,8 @@ class LandSatScene(object):
 
     @property
     def swir2(self):
+        if self.l2sp:
+            return self._band_proc('sr_b7')
         if self.satellite == 8:
             return self._band_proc('sr_band7')
         elif self.satellite == 7:
@@ -595,7 +669,7 @@ class LandSatScene(object):
         rgb = np.array(rgb * 255, dtype=np.uint8)
 
         with rasterio.Env():
-            profile = self._d['pixel_qa'].profile
+            profile = self._d[self.default_key].profile
             profile.update(
                 dtype=rasterio.ubyte,
                 count=3,
@@ -605,12 +679,16 @@ class LandSatScene(object):
                 dst.write(rgb.astype(rasterio.ubyte))
 
     def _veg_proc(self, measure):
-        res = self._d[measure].read(1, masked=True)
-        res = np.ma.masked_values(res, -9999.0)
-        res = np.ma.array(res, dtype=np.float64)
-        res *= 0.0001
-        res = np.clip(res, -1.0, 1.0)
-        return res
+
+        if self.l2sp:
+            return self._band_proc(measure)
+        else:
+            res = self._d[measure].read(1, masked=True)
+            res = np.ma.masked_values(res, -9999.0)
+            res = np.ma.array(res, dtype=np.float64)
+            res *= 0.0001
+            res = np.clip(res, -1.0, 1.0)
+            return res
 
     @property
     def ndvi(self):
@@ -716,7 +794,7 @@ class LandSatScene(object):
         """
         template rasterio.Dataset
         """
-        return self._d['pixel_qa']
+        return self._d[self.default_key]
 
     def dump(self, data, dst_fn, nodata=-9999, dtype=rasterio.float32):
         """
@@ -732,16 +810,20 @@ class LandSatScene(object):
         else:
             _data = data
 
-        with rasterio.Env():
-            profile = self._d['pixel_qa'].profile
+        with rasterio.Env(compress='lzw', tiled=True):
+            profile = self._d[self.default_key].profile
             profile.update(
-                dtype=rasterio.float32,
+                dtype=dtype,
                 count=1,
                 nodata=nodata,
-                compress='lzw')
+                interleave="pixel",
+                tiled=True,
+                blockxsize=512,
+                blockysize=512,
+                compress="PACKBITS")
 
             with rasterio.open(dst_fn, 'w', **profile) as dst:
-                dst.write(_data.astype(rasterio.float32), 1)
+                dst.write(_data.astype(dtype), 1)
 
     def clip(self, bounds, outdir, bands=None):
         """
@@ -753,6 +835,8 @@ class LandSatScene(object):
 
         if bands is None:
             bands = self.bands
+        
+        if not self.l2sp:
             bands = [k for k in bands if 'toa' not in k]
             bands = [k for k in bands if 'sensor' not in k]
             bands = [k for k in bands if 'solar' not in k]
@@ -815,3 +899,4 @@ class LandSatScene(object):
                                    out_shape=(src.count, height, width)))
 
         return LandSatScene(outdir)
+

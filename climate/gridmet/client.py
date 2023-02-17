@@ -162,7 +162,7 @@ if __name__ == "__main__":
     from api.app import RANGESAT_DIRS, Location
     import os
 
-    location = 'Zumwalt3'
+    location = 'Zumwalt4'
 
     _location = None
     for rangesat_dir in RANGESAT_DIRS:
@@ -188,7 +188,7 @@ if __name__ == "__main__":
             geo_locations[(pasture, ranch)] = _pasture['centroid']
 
     start_year = 1979
-    end_year = 2021
+    end_year = 2022
 
     met_dir = _join(_location.loc_path, 'gridmet')
     print(met_dir)

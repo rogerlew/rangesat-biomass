@@ -43,7 +43,7 @@ def extract(tar_fn, dst):
 def process_scene(scn_fn, verbose=True):
     global models, out_dir, sf, bbox, sf_feature_properties_key, sf_feature_properties_delimiter
 
-    assert '.tar.gz' in scn_fn
+#    assert '.tar.gz' in scn_fn
     if verbose:
         print(scn_fn, out_dir)
 
@@ -75,7 +75,7 @@ def process_scene(scn_fn, verbose=True):
 
     # Export grids
     print('exporting grids')
-    bio_model.export_grids(biomass_dir=_join(ls.basedir, 'biomass'))
+    bio_model.export_grids(biomass_dir=_join(ls.basedir, 'biomass'), dtype=rasterio.int16)
 
     # Analyze pastures
     print('analyzing pastures')
@@ -210,14 +210,15 @@ if __name__ == '__main__':
     scene_fn = sys.argv[-1]
 
     scn_bounds = get_gz_scene_bounds(scene_fn)
-    if not bounds_contain(bbox, scn_bounds):
+    if not bounds_intersect(bbox, scn_bounds):
         print('bounds do not intersect', bbox, scn_bounds)
         Path(_join(out_dir, '.{}'.format(_split(scene_fn.replace('.tar.gz', ''))[-1]))).touch()
         sys.exit()
 
     res = process_scene(scene_fn)
 
-    prefix = os.path.basename(os.path.normpath(scene_fn)).replace('.tar.gz', '')
+    prefix = os.path.basename(os.path.normpath(scene_fn)).replace('.tar.gz', '')\
+                                                         .replace('.tar', '')
 
     dump_pasture_stats([res], _join(out_dir, '%s_pasture_stats.csv' % prefix))
 
