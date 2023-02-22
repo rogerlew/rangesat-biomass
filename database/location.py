@@ -671,6 +671,22 @@ class Location(object):
         assert _exists(_split(dst_fn)[0])
         assert dst_fn.endswith('.tif')
 
+        def is_mappable_of_floats(x):
+            try:
+                float(x[0])
+                return True
+            except:
+                return False
+
+        def coords_3d_to_2d(coords):
+            _coords = []
+            for coord in coords:
+                if is_mappable_of_floats(coord):
+                    _coords.append((coord[0], coord[1]))
+                else:
+                    _coords.append(coords_3d_to_2d(coord))
+            return _coords 
+
         ds = rasterio.open(raster_fn)
         ds_proj4 = ds.crs.to_proj4()
 
@@ -700,6 +716,15 @@ class Location(object):
 
         utm_dst_fn = ''
         try:
+            features = [
+		    {
+			"type": g["type"],
+			"coordinates": coords_3d_to_2d(g["coordinates"]),
+		    }
+		    for g in features
+		]
+
+
             # true where valid
             pasture_mask, _, _ = raster_geometry_mask(ds, features)
             data = np.ma.array(ds.read(1, masked=True), mask=pasture_mask)
