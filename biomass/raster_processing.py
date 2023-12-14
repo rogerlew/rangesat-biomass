@@ -15,7 +15,7 @@ import warnings
 from osgeo import gdal
 
 
-def transform_to_template_ds(template_fn, src_fn, dst_fn):
+def transform_to_template_ds(template_fn, src_fn, dst_fn, verbose=True):
     ds = gdal.Open(template_fn)
 
     transform = ds.GetGeoTransform()
@@ -34,6 +34,8 @@ def transform_to_template_ds(template_fn, src_fn, dst_fn):
         os.remove(dst_fn)
 
     cmd = ['gdalwarp', '-ts', x, y, '-te', xmin, ymin, xmax, ymax, '-t_srs', wkt, src_fn, dst_fn]
+    if verbose:
+        print(' '.join([str(v) for v in cmd]))
     cmd = [str(v) for v in cmd]
     p = Popen(cmd)
     p.wait()
