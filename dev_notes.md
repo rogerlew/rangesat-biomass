@@ -19,7 +19,7 @@ Hosted by apache2
 
 site is in `/var/www/html/rangesat/web`
 
-### Old QNAS for Landsat Collection 1
+### Old QNAS for Landsat Collection 1 (deprecated)
 
 Store of raw Landsat Collection 1 scenes from earth explorer
 
@@ -28,7 +28,7 @@ Store of raw Landsat Collection 1 scenes from earth explorer
 - hostname is `torch.aa.uidaho.edu`
 - share name is `bunchgrass`
 - mounted to `/geodata/torch-landsat/`
-- Not currently connected or available. not sure why? 12/14/2023
+- Not currently connected or available. (not sure why it went offline 12/14/2023)
 - Earth Explorer retired Collection 1 end of 2022
 
 
@@ -37,11 +37,13 @@ Store of raw Landsat Collection 1 scenes from earth explorer
 in `/geodata/nas/landsat/zumwalt/<year>`
 
 
-## Workflow for processing Zumwalt scenes
+## Workflow for processing new scenes for Zumwalt (Adding a new year)
 
 ### 1. Acquire clean Landsat 7 / 8 / 9 Collection 2 scenes from Earth Explorer
 
 - Done manually to visual inspect cloud cover on the Zumwalt
+- Just acquire 043208 scenes. These fully cover the Zumwalt area. There are row/paths that intersect the Zumwalt but if you get both for the same date the api can get confused.
+- There is some alpha support for merging row/paths from the same satellite and date.
 
 ### 2. Download scenes to server
 
@@ -136,7 +138,7 @@ models:
             discriminate_threshold: 0.38
             discriminate_index: ndvi
             summer_int: 101.09
-            summer_slp: 330.25│/var/www/rangesat-biomass/database/scripts/
+            summer_slp: 330.25
             summer_index: nbr
             fall_int: -58.04
             fall_slp: 1070.64
@@ -296,3 +298,7 @@ The `climate/gridmet/scripts/sync_current_year.py` script is using a daily cront
 edit with `sudo crontab -e`
 
 The climate data is saved as .npy binary files as `<location>/gridmet/<ranch>/<pasture>/<year>/<measure>.npy`
+
+
+### TODO
+
