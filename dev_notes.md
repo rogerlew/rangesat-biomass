@@ -205,7 +205,13 @@ Make sure the new scenes are processed
 
 #### 6. Configure frontend
 
-Ask Jen
+Ask Jen, Just adding years might require adding a new select option.
+
+If ranches are added to the shape file or site or if new user accounts are needed, Jen can set them up.
+
+Or if the name of the biomass models are changed, frontend might need updated.
+
+Or if the site name is revised e.g. Zumwalt4 -> Zumwalt5 frontend might need updated.
 
 ## API orientation
 
@@ -237,7 +243,6 @@ https://rangesat.org/api/gridmet/annual-progression-monthly/Zumwalt4/The_Nature_
 
 https://rangesat.org/api/pasturestats/seasonal-progression/Zumwalt4/?ranch=The_Nature_Conservancy&pasture=A1
 
-(Seeing if I can find clean April and June scenes.
 https://rangesat.org/api/pasturestats/single-year-monthly/Zumwalt4/?ranch=The_Nature_Conservancy&pasture=A1&year=2022
 
 https://rangesat.org/api/pasturestats/multi-year/Zumwalt4/?ranch=The_Nature_Conservancy&pasture=A1&start_year=1984&end_year=2022&start_date=05-15&end_date=07-15&agg_func=mean&units=English
@@ -252,9 +257,11 @@ The configuration of the sites is directory based.
 Would recommend putting sites in /geodata/nas/rangesat
 
 Use `du -h` to see available disk usage on the NAS. Ask Luke Sheneman for more space if needed.
+
+
 The api provides geojson resources to clients. To accomplish this it needs a WGS pastures.geojson in the project root. This json should have the same shapes as the `sf_fn` file used to process the scenes.
 
-There is also a config.yaml in the site directory.
+**There is also a config.yaml in the site directory.**
 
 The config.yaml also specifies parameters that are used by `database.location.Location` 
 
@@ -278,6 +285,7 @@ The config.yaml also specifies parameters that are used by `database.location.Lo
 The scene processing does not crop individual rasters. To serve rasters for single ranch locations raster masks are needed for fast processing. (it should work without them, but is faster with them). The raster masks are in raster_masks. Each ranch has a utm and a wgs raster mask.
 
 The script to build the masks is 'database/scripts/make_raster_masks.py'
+
 
 ### Gridmet data
 
