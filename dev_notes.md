@@ -126,7 +126,8 @@ It provides functionality to:
 
 `biomass.rangesat_biomass` processes biomass models defined in yaml site configuration files. These have parameters for models by satellite and season (fall, spring)
 
-Example model configuration
+##### Example model from yaml
+
 ```yaml
 models:
     - name: Herbaceous
@@ -146,6 +147,17 @@ models:
           - satellite: 8
             ...
 ```
+
+The .yaml configuation also defines the shapefile to extract pasture statistics.
+
+```yaml
+sf_fn: /geodata/nas/rangesat/Zumwalt4/vector_data/Zumwalt2023.shp
+```
+
+##### Spatial Reference
+
+The landsat scenes are cropped in their original spatial reference. The Zumwalt scenes are in UTM 11N. Likely the sf_fn needs to be in the same projection as the landsat scenes.
+
 
 #### Updating Models/Pastures and Reprocessing
 
@@ -192,6 +204,77 @@ Make sure the new scenes are processed
 
 ## API orientation
 
-The rangesat API is implemented as a Python Flask app. The api is in 
-rangesat-biomasss/api
+The rangesat API is implemented as a Python Flask app. The api is in `rangesat_biomass/api`
 
+The api endpoints that are used by rangesat.org are:
+
+https://rangesat.org/api/geojson/Zumwalt4/The_Nature_Conservancy/
+
+https://rangesat.org/api/pasturestats/intra-year/Zumwalt4/?year=2022&start_date=6-1&end_date=6-30&ranch=The_Nature_Conservancy
+
+https://rangesat.org/api/pasturestats/intra-year/Zumwalt4/?year=2022&start_date=5-1&end_date=6-30&ranch=The_Nature_Conservancy
+
+https://www.rangesat.org/api/scenemeta/Zumwalt4/?pasture_coverage_threshold=0.5&filter=latest
+
+https://www.rangesat.org/api/scenemeta/Zumwalt4/?pasture_coverage_threshold=0.5
+
+https://rangesat.org/api/raster/Zumwalt4/LC08_L1TP_043028_20210906_20210916_01_T1/biomass/?ranches=[%27The_Nature_Conservancy%27]
+
+https://www.rangesat.org/api/histogram/single-scene/Zumwalt4/The_Nature_Conservancy/?bins=[0,112.08511557166881,168.12767335750323,500]&product=biomass&product_id=LC08_L1TP_043028_20210906_20210916_01_T1
+
+https://www.rangesat.org/api/histogram/single-scene-bypasture/Zumwalt4/The_Nature_Conservancy/?bins=[0,112.08511557166881,168.12767335750323,500]&product=biomass&product_id=LC08_L1TP_043028_20210906_20210916_01_T1
+
+https://rangesat.org/api/raster-processing/difference/Zumwalt4/biomass/?product_id=LC08_L1TP_043028_20210906_20210916_01_T1&product_id2=LC08_L1TP_043028_20210602_20210608_01_T1&ranches=[%27The_Nature_Conservancy%27]
+
+https://rangesat.org/api/gridmet/single-year-monthly/Zumwalt4/The_Nature_Conservancy/A1/?year=2022&units=English
+
+https://rangesat.org/api/gridmet/annual-progression-monthly/Zumwalt4/The_Nature_Conservancy/A1/?year=2022&units=English
+
+https://rangesat.org/api/pasturestats/seasonal-progression/Zumwalt4/?ranch=The_Nature_Conservancy&pasture=A1
+
+(Seeing if I can find clean April and June scenes.
+https://rangesat.org/api/pasturestats/single-year-monthly/Zumwalt4/?ranch=The_Nature_Conservancy&pasture=A1&year=2022
+
+https://rangesat.org/api/pasturestats/multi-year/Zumwalt4/?ranch=The_Nature_Conservancy&pasture=A1&start_year=1984&end_year=2022&start_date=05-15&end_date=07-15&agg_func=mean&units=English
+
+
+### Site Configuration
+
+The configuration of the sites is directory based.
+
+`all_your_base.RANGESAT_DIRS` defines a short list of directories that can contain sites. Sites are defined by the name of the directory.
+
+Would recommend putting sites in /geodata/nas/rangesat
+
+Use `du -h` to see available disk usage on the NAS. Ask Luke Sheneman for more space if needed.
+The api provides geojson resources to clients. To accomplish this it needs a WGS pastures.geojson in the project root. This json should have the same shapes as the `sf_fn` file used to process the scenes.
+
+There is also a config.yaml in the site directory.
+
+The config.yaml also specifies parameters that are used by `database.location.Location` 
+
+`sf_fn` is a shapefile path that is used by to load the pasture metadata
+
+`sf_feature_properties_key` specifies a column name from the attribute table containing ranch and pasture IDs.
+
+`sf_feature_properties_delimiter` specifies a delimiter character that splits ranch and pasture names in the sf_feature_properties_key column. It defaults to `+`
+
+`models` I believe is unused by the api
+
+`out_dir` specifies the analyzed_rasters directory that the scenes are processed into. it is used to find the .db files for the location
+
+#### raster masks
+
+The scene processing does not crop individual rasters. To serve rasters for single ranch locations raster masks are needed for fast processing. (it should work without them, but is faster with them). The raster masks are in raster_masks. Each ranch has a utm and a wgs raster mask.
+
+The script to build the masks is 'database/scripts/make_raster_masks.py'
+
+### Gridmet data
+
+Gridmet data is acquired through a gridmet web client. The client is `climate/gridmet/client.py` The bottom contains an if `__name__ == "__main__":` section to acquire gridmet data for new sites.
+
+The `climate/gridmet/scripts/sync_current_year.py` script is using a daily crontab to update location climate data.
+
+edit with `sudo crontab -e`
+
+The climate data is saved as .npy binary files as `<location>/gridmet/<ranch>/<pasture>/<year>/<measure>.npy`
