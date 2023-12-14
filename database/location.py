@@ -21,7 +21,7 @@ from osgeo import osr
 
 sys.path.insert(0, os.path.abspath('../'))
 
-from all_your_base import GEODATA_DIRS, rat_extract
+from all_your_base import GEODATA_DIRS, rat_extract, is_mappable_of_floats, coords_3d_to_2d
 
 
 def wkt_2_proj4(wkt):
@@ -347,6 +347,14 @@ class Location(object):
         if len(features) == 0:
             raise KeyError((ranch, pasture))
 
+        features = [
+		    {
+			"type": g["type"],
+			"coordinates": coords_3d_to_2d(g["coordinates"]),
+		    }
+		    for g in features
+	]
+
         pasture_mask, _, _ = raster_geometry_mask(ds, features)
         indx = np.where(pasture_mask == False)
         return indx
@@ -671,22 +679,6 @@ class Location(object):
         assert _exists(_split(dst_fn)[0])
         assert dst_fn.endswith('.tif')
 
-        def is_mappable_of_floats(x):
-            try:
-                float(x[0])
-                return True
-            except:
-                return False
-
-        def coords_3d_to_2d(coords):
-            _coords = []
-            for coord in coords:
-                if is_mappable_of_floats(coord):
-                    _coords.append((coord[0], coord[1]))
-                else:
-                    _coords.append(coords_3d_to_2d(coord))
-            return _coords 
-
         ds = rasterio.open(raster_fn)
         ds_proj4 = ds.crs.to_proj4()
 
@@ -723,7 +715,6 @@ class Location(object):
 		    }
 		    for g in features
 		]
-
 
             # true where valid
             pasture_mask, _, _ = raster_geometry_mask(ds, features)
