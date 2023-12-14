@@ -268,6 +268,11 @@ The config.yaml also specifies parameters that are used by `database.location.Lo
 
 `out_dir` specifies the analyzed_rasters directory that the scenes are processed into. it is used to find the .db files for the location
 
+`reverse_key` specifies whether to unpack sf_feature_properties_key as pasture, ranch or ranch, pasture.
+
+(Zumwalt4 is with reverse_key = true, this was done as a hotfix that I regret. would be better to just change the shapefiles...)
+
+
 #### raster masks
 
 The scene processing does not crop individual rasters. To serve rasters for single ranch locations raster masks are needed for fast processing. (it should work without them, but is faster with them). The raster masks are in raster_masks. Each ranch has a utm and a wgs raster mask.
