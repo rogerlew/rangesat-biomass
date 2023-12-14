@@ -35,6 +35,25 @@ if not exists(SCRATCH):
     SCRATCH = '/Users/roger/Downloads'
 
 
+def is_mappable_of_floats(x):
+    try:
+        float(x[0])
+        return True
+    except:
+        return False
+
+
+def coords_3d_to_2d(coords):
+    _coords = []
+    for coord in coords:
+        if is_mappable_of_floats(coord):
+            _coords.append((coord[0], coord[1]))
+        else:
+            _coords.append(coords_3d_to_2d(coord))
+    return _coords 
+
+
+
 def wkt_2_proj4(wkt):
     srs = osr.SpatialReference()
     srs.ImportFromWkt(wkt)
