@@ -39,17 +39,17 @@ in `/geodata/nas/landsat/zumwalt/<year>`
 
 ## Workflow for processing Zumwalt scenes
 
-### Acquire clean Landsat 7 / 8 / 9 Collection 2 scenes from Earth Explorer
+### 1. Acquire clean Landsat 7 / 8 / 9 Collection 2 scenes from Earth Explorer
 
 - Done manually to visual inspect cloud cover on the Zumwalt
 
-### Download scenes to server
+### 2. Download scenes to server
 
 - place in `/geodata/nas/landsat/zumwalt/<year>`
 
 (I think I used wget to download scenes)
 
-### Process scenes
+### 3. Process scenes
 
 #### Background
 
@@ -169,7 +169,7 @@ If the model parameters or pastures shapefile need updating it is possible to re
 ```
 
 
-### Build Database
+### 4. Build Database
 
 The API uses sqlite3 as a database. Sqlite3 is a light weight file based relational database. The database is only for the pasture statistics and is readonly.
 
@@ -179,16 +179,16 @@ The database has two files:
 
 `/geodata/nas/rangesat/Zumwalt4/analyzed_rasters/scenemeta_coverage.db` has coverage (valid cloud free areas) by scene and pasture. this is used to support API filtering.
 
-#### 1. (Recommended) backup the .db files
+##### 4.1. (Recommended) backup the .db files
 
-#### 2. Build the sqlite3.db
+##### 4.2. Build the sqlite3.db
 
 ```bash
 > cd /var/www/rangesat-biomass/database/scripts/
 > python3 build_sqlite_db.py Zumwalt4
 ```
 
-#### 3. Build the scenemeta_coverage.db
+##### 4.3. Build the scenemeta_coverage.db
 
 Then build the scenemeta_coverage.db. This script reads the sqlite3.db so it needs to be done sond
 
@@ -198,9 +198,14 @@ Then build the scenemeta_coverage.db. This script reads the sqlite3.db so it nee
 ```
 
 
-### test api routes (See API Orientation)
+### 5. Test api routes (See API Orientation)
 
 Make sure the new scenes are processed
+
+
+#### 6. Configure frontend
+
+Ask Jen
 
 ## API orientation
 
