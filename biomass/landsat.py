@@ -70,7 +70,7 @@ class LandSatScene(object):
             self.tar_fn = fn
 
         tail, head = _split(fn)
-        self._l2sp = '_l2sp_' in head.lower()
+        self._l2sp = '_l2sp_' in fn.lower()
 
         self._build_bqa()
 
