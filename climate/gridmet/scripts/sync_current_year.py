@@ -13,7 +13,7 @@ from climate.gridmet import retrieve_timeseries, GridMetVariable
 
 current_year = datetime.now().year
 
-locations = ['Zumwalt2', 'Zumwalt3', 'SageSteppe', 'RCR', 'BIBU', 'PAVA',  'JISA', 'BRBE']
+locations = ['Zumwalt4', 'Zumwalt2', 'Zumwalt3', 'SageSteppe', 'RCR', 'BIBU', 'PAVA',  'JISA', 'BRBE']
 
 for location in locations:
     _location = None

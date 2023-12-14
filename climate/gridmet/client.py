@@ -187,8 +187,8 @@ if __name__ == "__main__":
             pasture = pasture.replace("'", "~").replace(' ', '_')
             geo_locations[(pasture, ranch)] = _pasture['centroid']
 
-    start_year = 1979
-    end_year = 2022
+    start_year = 2022
+    end_year = 2023
 
     met_dir = _join(_location.loc_path, 'gridmet')
     print(met_dir)
