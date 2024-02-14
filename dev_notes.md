@@ -39,21 +39,21 @@ in `/geodata/nas/landsat/zumwalt/<year>`
 
 ## Workflow for processing new scenes for Zumwalt (Adding a new year)
 
-### 1. Acquire clean Landsat 7 / 8 / 9 Collection 2 scenes from Earth Explorer
+#### 1. Acquire clean Landsat 7 / 8 / 9 Collection 2 scenes from Earth Explorer
 
 - Done manually to visual inspect cloud cover on the Zumwalt
 - Just acquire 043208 scenes. These fully cover the Zumwalt area. There are row/paths that intersect the Zumwalt but if you get both for the same date the api can get confused.
 - There is some alpha support for merging row/paths from the same satellite and date.
 
-### 2. Download scenes to server
+#### 2. Download scenes to server
 
 - place in `/geodata/nas/landsat/zumwalt/<year>`
 
 (I think I used wget to download scenes)
 
-### 3. Process scenes
+#### 3. Process scenes
 
-#### Background
+##### Background
 
 `/var/www/rangesat-biomass/biomass/scripts` contains .yaml site configuation files and scripts to process the scenes
 
@@ -71,7 +71,7 @@ These are also in the `analyzed_rasters` directory stored by `<scene_id>_pasture
 
 **Recommeded**: spot check .csv files to make sure they contain data
 
-#### Scripts
+##### Scripts
 
 **Highly recommended**
 
@@ -113,7 +113,7 @@ fns = [fn for fn in fns if not is_processed(fn)]
 
 This script uses subprocess to call the process_scene.py script.
 
-#### Scene Processing Details
+##### Scene Processing Details
 
 `biomass.landsat` has a Landsat class that can handle Collection 1 (5/7/8) and Collection 2 (7/8/9) datasets.
 
@@ -161,7 +161,7 @@ sf_fn: /geodata/nas/rangesat/Zumwalt4/vector_data/Zumwalt2023.shp
 The landsat scenes are cropped in their original spatial reference. The Zumwalt scenes are in UTM 11N. Likely the sf_fn needs to be in the same projection as the landsat scenes.
 
 
-#### Updating Models/Pastures and Reprocessing
+##### Updating Models/Pastures and Reprocessing
 
 If the model parameters or pastures shapefile need updating it is possible to reprocess just the biomass statistics without having to crop/extract each scene using the `recalc_pasture_stats.py` script. it will iterate over existing scenes and rebuild just the biomass grids and extract pasture statistics
 
@@ -171,7 +171,7 @@ If the model parameters or pastures shapefile need updating it is possible to re
 ```
 
 
-### 4. Build Database
+#### 4. Build Database
 
 The API uses sqlite3 as a database. Sqlite3 is a light weight file based relational database. The database is only for the pasture statistics and is readonly.
 
@@ -203,7 +203,7 @@ Then build the scenemeta_coverage.db. This script reads the sqlite3.db so it nee
 
 [DB Browser for SQLite](https://sqlitebrowser.org/) is a handy tool for viewing the contents of the *.db files. It can also export tables to .csv
 
-### 5. Restart API
+#### 5. Restart API
 
 The Flask API caches responses for many routes. The cache can be reset with
 
@@ -211,7 +211,7 @@ The Flask API caches responses for many routes. The cache can be reset with
 > sudo apachectl graceful
 ```
 
-### 6. Test api routes (See API Orientation)
+#### 6. Test api routes (See API Orientation)
 
 Make sure the new scenes are processed
 
