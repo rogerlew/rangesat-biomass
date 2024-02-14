@@ -199,13 +199,20 @@ Then build the scenemeta_coverage.db. This script reads the sqlite3.db so it nee
 > python3 build_scenemeta_coverage_db.py Zumwalt4
 ```
 
+### 5. Restart API
 
-### 5. Test api routes (See API Orientation)
+The Flask API caches responses for many routes. The cache can be reset with
+
+```bash
+> sudo apachectl graceful
+```
+
+### 6. Test api routes (See API Orientation)
 
 Make sure the new scenes are processed
 
 
-#### 6. Configure frontend
+#### 7. Configure frontend
 
 Ask Jen, Just adding years might require adding a new select option.
 
