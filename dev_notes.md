@@ -199,6 +199,10 @@ Then build the scenemeta_coverage.db. This script reads the sqlite3.db so it nee
 > python3 build_scenemeta_coverage_db.py Zumwalt4
 ```
 
+##### Note
+
+[DB Browser for SQLite](https://sqlitebrowser.org/) is a handy tool for viewing the contents of the *.db files. It can also export tables to .csv
+
 ### 5. Restart API
 
 The Flask API caches responses for many routes. The cache can be reset with
