@@ -19,7 +19,7 @@ Hosted by apache2
 
 site is in `/var/www/html/rangesat/web`
 
-### Old QNAS for Landsat Collection 1
+### Old QNAS for Landsat Collection 1 (deprecated)
 
 Store of raw Landsat Collection 1 scenes from earth explorer
 
@@ -28,7 +28,7 @@ Store of raw Landsat Collection 1 scenes from earth explorer
 - hostname is `torch.aa.uidaho.edu`
 - share name is `bunchgrass`
 - mounted to `/geodata/torch-landsat/`
-- Not currently connected or available. not sure why? 12/14/2023
+- Not currently connected or available. (not sure why it went offline 12/14/2023)
 - Earth Explorer retired Collection 1 end of 2022
 
 
@@ -37,21 +37,23 @@ Store of raw Landsat Collection 1 scenes from earth explorer
 in `/geodata/nas/landsat/zumwalt/<year>`
 
 
-## Workflow for processing Zumwalt scenes
+## Workflow for processing new scenes for Zumwalt (Adding a new year)
 
-### 1. Acquire clean Landsat 7 / 8 / 9 Collection 2 scenes from Earth Explorer
+#### 1. Acquire clean Landsat 7 / 8 / 9 Collection 2 scenes from Earth Explorer
 
 - Done manually to visual inspect cloud cover on the Zumwalt
+- Just acquire 043208 scenes. These fully cover the Zumwalt area. There are row/paths that intersect the Zumwalt but if you get both for the same date the api can get confused.
+- There is some alpha support for merging row/paths from the same satellite and date.
 
-### 2. Download scenes to server
+#### 2. Download scenes to server
 
 - place in `/geodata/nas/landsat/zumwalt/<year>`
 
 (I think I used wget to download scenes)
 
-### 3. Process scenes
+#### 3. Process scenes
 
-#### Background
+##### Background
 
 `/var/www/rangesat-biomass/biomass/scripts` contains .yaml site configuation files and scripts to process the scenes
 
@@ -69,7 +71,7 @@ These are also in the `analyzed_rasters` directory stored by `<scene_id>_pasture
 
 **Recommeded**: spot check .csv files to make sure they contain data
 
-#### Scripts
+##### Scripts
 
 **Highly recommended**
 
@@ -113,7 +115,7 @@ fns = [fn for fn in fns if not is_processed(fn)]
 
 This script uses subprocess to call the process_scene.py script.
 
-#### Scene Processing Details
+##### Scene Processing Details
 
 `biomass.landsat` has a Landsat class that can handle Collection 1 (5/7/8) and Collection 2 (7/8/9) datasets.
 
@@ -138,7 +140,7 @@ models:
             discriminate_threshold: 0.38
             discriminate_index: ndvi
             summer_int: 101.09
-            summer_slp: 330.25│/var/www/rangesat-biomass/database/scripts/
+            summer_slp: 330.25
             summer_index: nbr
             fall_int: -58.04
             fall_slp: 1070.64
@@ -161,7 +163,7 @@ sf_fn: /geodata/nas/rangesat/Zumwalt4/vector_data/Zumwalt2023.shp
 The landsat scenes are cropped in their original spatial reference. The Zumwalt scenes are in UTM 11N. Likely the sf_fn needs to be in the same projection as the landsat scenes.
 
 
-#### Updating Models/Pastures and Reprocessing
+##### Updating Models/Pastures and Reprocessing
 
 If the model parameters or pastures shapefile need updating it is possible to reprocess just the biomass statistics without having to crop/extract each scene using the `recalc_pasture_stats.py` script. it will iterate over existing scenes and rebuild just the biomass grids and extract pasture statistics
 
@@ -171,7 +173,7 @@ If the model parameters or pastures shapefile need updating it is possible to re
 ```
 
 
-### 4. Build Database
+#### 4. Build Database
 
 The API uses sqlite3 as a database. Sqlite3 is a light weight file based relational database. The database is only for the pasture statistics and is readonly.
 
@@ -199,15 +201,32 @@ Then build the scenemeta_coverage.db. This script reads the sqlite3.db so it nee
 > python3 build_scenemeta_coverage_db.py Zumwalt4
 ```
 
+##### Note
 
-### 5. Test api routes (See API Orientation)
+[DB Browser for SQLite](https://sqlitebrowser.org/) is a handy tool for viewing the contents of the *.db files. It can also export tables to .csv
+
+#### 5. Restart API
+
+The Flask API caches responses for many routes. The cache can be reset with
+
+```bash
+> sudo apachectl graceful
+```
+
+#### 6. Test api routes (See API Orientation)
 
 Make sure the new scenes are processed
 
 
-#### 6. Configure frontend
+#### 7. Configure frontend
 
-Ask Jen
+Ask Jen, Just adding years might require adding a new select option.
+
+If ranches are added to the shape file or site or if new user accounts are needed, Jen can set them up.
+
+Or if the name of the biomass models are changed, frontend might need updated.
+
+Or if the site name is revised e.g. Zumwalt4 -> Zumwalt5 frontend might need updated.
 
 ## API orientation
 
@@ -246,7 +265,6 @@ https://rangesat.org/api/gridmet/annual-progression-monthly/Zumwalt4/The_Nature_
 
 https://rangesat.org/api/pasturestats/seasonal-progression/Zumwalt4/?ranch=The_Nature_Conservancy&pasture=A1
 
-(Seeing if I can find clean April and June scenes.
 https://rangesat.org/api/pasturestats/single-year-monthly/Zumwalt4/?ranch=The_Nature_Conservancy&pasture=A1&year=2022
 
 https://rangesat.org/api/pasturestats/multi-year/Zumwalt4/?ranch=The_Nature_Conservancy&pasture=A1&start_year=1984&end_year=2022&start_date=05-15&end_date=07-15&agg_func=mean&units=English
@@ -261,10 +279,18 @@ The configuration of the sites is directory based.
 Would recommend putting sites in `/geodata/nas/rangesat`
 
 Use `du -h` to see available disk usage on the NAS. Ask Luke Sheneman for more space if needed.
+<<<<<<< HEAD
 
 The api provides geojson resources to clients. To accomplish this it needs a WGS `pastures.geojson` in the project root. This json should have the same shapes as the `sf_fn` file used to process the scenes.
 
 There is also a `config.yaml` in the site directory.
+=======
+
+
+The api provides geojson resources to clients. To accomplish this it needs a WGS pastures.geojson in the project root. This json should have the same shapes as the `sf_fn` file used to process the scenes.
+
+**There is also a config.yaml in the site directory.**
+>>>>>>> 0280c35f9140f816858c665c8878c87bc6ce19ab
 
 The `config.yaml` also specifies parameters that are used by `database.location.Location` 
 
@@ -278,11 +304,17 @@ The `config.yaml` also specifies parameters that are used by `database.location.
 
 `out_dir` specifies the analyzed_rasters directory that the scenes are processed into. it is used to find the .db files for the location
 
+`reverse_key` specifies whether to unpack sf_feature_properties_key as pasture, ranch or ranch, pasture.
+
+(Zumwalt4 is with reverse_key = true, this was done as a hotfix that I regret. would be better to just change the shapefiles...)
+
+
 #### raster masks
 
 The scene processing does not crop individual rasters. To serve rasters for single ranch locations raster masks are needed for fast processing. In otherwords each ranch has it's own set of raster masks: a utm raster mask and a wgs raster maske. It should work without them, but is faster with them. The raster masks are in raster_masks. Each ranch has a utm and a wgs raster mask.
 
 The script to build the masks is 'database/scripts/make_raster_masks.py'
+
 
 ### Gridmet data
 
@@ -294,6 +326,7 @@ edit with `sudo crontab -e`
 
 The climate data is saved as .npy binary files as `<location>/gridmet/<ranch>/<pasture>/<year>/<measure>.npy`
 
+<<<<<<< HEAD
 ## Deploying New Pasture Map / Deploying Revised Models
 
 The strategy is build the new database along side the existing databases and then swap the frontend to the new database.
@@ -542,3 +575,8 @@ sudo chmod -R 775 Zumwalt5
 ```
 
 9. Check endpoints
+=======
+
+### TODO
+
+>>>>>>> 0280c35f9140f816858c665c8878c87bc6ce19ab
