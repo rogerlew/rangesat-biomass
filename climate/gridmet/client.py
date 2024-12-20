@@ -161,8 +161,9 @@ def retrieve_timeseries(variables, locations, start_year, end_year, met_dir):
 if __name__ == "__main__":
     from api.app import RANGESAT_DIRS, Location
     import os
+    import sys
 
-    location = 'Zumwalt4'
+    location = sys.argv[-1]
 
     _location = None
     for rangesat_dir in RANGESAT_DIRS:
@@ -187,12 +188,13 @@ if __name__ == "__main__":
             pasture = pasture.replace("'", "~").replace(' ', '_')
             geo_locations[(pasture, ranch)] = _pasture['centroid']
 
-    start_year = 2022
-    end_year = 2023
+    start_year = 1979
+    end_year = 2024
 
     met_dir = _join(_location.loc_path, 'gridmet')
     print(met_dir)
 
+    print('retrieving climates... this could take awhile (20m)')
     if exists(met_dir):
         shutil.rmtree(met_dir)
 
@@ -200,3 +202,4 @@ if __name__ == "__main__":
     d = retrieve_timeseries([var for var in GridMetVariable],
                             geo_locations, start_year, end_year, met_dir)
 
+    print('done.')

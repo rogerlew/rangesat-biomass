@@ -54,19 +54,19 @@ models:
             log_transformed_estimate: False
 
 # shapefile containing pastures to analyze
-sf_fn: /space/rangesat/Zumwalt/vector_data/Pastures_ForageAreas_2018_AllZumClip.shp
+sf_fn: /geodata/nas/rangesat/Zumwalt5/vector_data/Zumwalt2025_w_PastID_Key.shp
 
 # primary key for pastures in shapefile
 # e.g. key = feature['properties'][sf_feature_properties_key]
 sf_feature_properties_key: PastID_Key
 
 # location to place cropped landsat scenes and biomass rasters
-out_dir: /space/rangesat/Zumwalt/analyzed_rasters
+out_dir: /geodata/nas/rangesat/Zumwalt5/analyzed_rasters
 
 # directory containing extracted landsat scenes
-landsat_scene_directory: /geodata/torch-landsat
+landsat_scene_directory: /geodata/nas/landsat/zumwalt
 
 # path rows that should be skipped
 wrs_blacklist: []
 
-wrs_whitelist: [042028, 043028, 042029]
+wrs_whitelist: [042028, 043028, 042029, 043029]

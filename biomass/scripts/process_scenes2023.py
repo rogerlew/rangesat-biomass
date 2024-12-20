@@ -2,7 +2,6 @@ import sys
 import yaml
 import os
 import shutil
-import argparse
 import multiprocessing
 import csv
 import random
@@ -61,24 +60,8 @@ def is_processed(fn):
 # work with multiprocessing.
 
 
-parser = argparse.ArgumentParser(description="Process a configuration file and a Landsat scene directory.")
-parser.add_argument("cfg_fn", type=str, help="Path to the configuration file (must be a .yaml file).")
-parser.add_argument("landsat_scene_directory", type=str, help="Path to the Landsat scene directory.")
-
-args = parser.parse_args()
-
-# Validate configuration file
-assert args.cfg_fn.endswith('.yaml'), f"Is {args.cfg_fn} a config file?"
-
-cfg_fn = args.cfg_fn
-
-# Validate Landsat scene directory
-assert os.path.exists(args.landsat_scene_directory), f"landsat_scene_directory={args.landsat_scene_directory} directory does not exist"
-
-landsat_scene_directory = args.landsat_scene_directory
-
-print("Configuration file:", cfg_fn)
-print("Landsat scene directory:", landsat_scene_directory)
+cfg_fn = sys.argv[-1]
+assert cfg_fn.endswith('.yaml'), "Is %s a config file?" % cfg_fn
 
 with open(cfg_fn) as fp:
     yaml_txt = fp.read()
@@ -99,7 +82,7 @@ sf_fn = os.path.abspath(sf_fn)
 sf = fiona.open(sf_fn, 'r')
 bbox = get_sf_wgs_bounds(sf_fn)
 
-#landsat_scene_directory = '/geodata/nas/landsat/zumwalt/2020'
+landsat_scene_directory = '/geodata/nas/landsat/zumwalt/2023'
 #landsat_scene_directory = _join(_d['landsat_scene_directory'], 'collection2')
 #landsat_scene_directory = _d['landsat_scene_directory']
 
@@ -119,12 +102,12 @@ if __name__ == '__main__':
 #    if _exists(out_dir):
 #        shutil.rmtree(out_dir)
 
-    if not _exists(out_dir):
-        os.makedirs(out_dir)
+#    os.makedirs(out_dir)
 
     # find all the scenes
 #    fns = glob(_join(landsat_scene_directory, '*202*-*.tar.gz'))
-    fns = glob(_join(landsat_scene_directory, '**', '*.tar'), recursive=True)
+    fns = glob(_join(landsat_scene_directory, '*.tar'))
+
 #    print(landsat_scene_directory, fns)
 
     """

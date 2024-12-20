@@ -88,7 +88,9 @@ Example usage:
 
 `/var/www/rangesat-biomass/biomass/scripts/process_scenes.py` processes a collection of scenes for a single site
 
-it expects the site config as a command line arguement
+it expects the site config as a command line arguement **and (as of 12/20/2024) the landsat_scene_directory** (e.g. /geodata/nas/landsat/zumwalt/)
+
+It will apply recursive glob to find scenes relative to the `landsat_scene_directory`
 
 Example usage:
 
@@ -209,7 +211,14 @@ Ask Jen
 
 ## API orientation
 
-The rangesat API is implemented as a Python Flask app. The api is in `rangesat_biomass/api`
+The rangesat API is implemented as a python3 Flask app. The api is in `rangesat_biomass/api`
+
+**The API cache's routes so you may need to restart apache to get the routes to actual reprocess requests**
+
+```bash
+sudo apachectl stop
+sudo apachectl start
+```
 
 The api endpoints that are used by rangesat.org are:
 
@@ -249,14 +258,15 @@ The configuration of the sites is directory based.
 
 `all_your_base.RANGESAT_DIRS` defines a short list of directories that can contain sites. Sites are defined by the name of the directory.
 
-Would recommend putting sites in /geodata/nas/rangesat
+Would recommend putting sites in `/geodata/nas/rangesat`
 
 Use `du -h` to see available disk usage on the NAS. Ask Luke Sheneman for more space if needed.
-The api provides geojson resources to clients. To accomplish this it needs a WGS pastures.geojson in the project root. This json should have the same shapes as the `sf_fn` file used to process the scenes.
 
-There is also a config.yaml in the site directory.
+The api provides geojson resources to clients. To accomplish this it needs a WGS `pastures.geojson` in the project root. This json should have the same shapes as the `sf_fn` file used to process the scenes.
 
-The config.yaml also specifies parameters that are used by `database.location.Location` 
+There is also a `config.yaml` in the site directory.
+
+The `config.yaml` also specifies parameters that are used by `database.location.Location` 
 
 `sf_fn` is a shapefile path that is used by to load the pasture metadata
 
@@ -270,7 +280,7 @@ The config.yaml also specifies parameters that are used by `database.location.Lo
 
 #### raster masks
 
-The scene processing does not crop individual rasters. To serve rasters for single ranch locations raster masks are needed for fast processing. (it should work without them, but is faster with them). The raster masks are in raster_masks. Each ranch has a utm and a wgs raster mask.
+The scene processing does not crop individual rasters. To serve rasters for single ranch locations raster masks are needed for fast processing. In otherwords each ranch has it's own set of raster masks: a utm raster mask and a wgs raster maske. It should work without them, but is faster with them. The raster masks are in raster_masks. Each ranch has a utm and a wgs raster mask.
 
 The script to build the masks is 'database/scripts/make_raster_masks.py'
 
@@ -283,3 +293,252 @@ The `climate/gridmet/scripts/sync_current_year.py` script is using a daily cront
 edit with `sudo crontab -e`
 
 The climate data is saved as .npy binary files as `<location>/gridmet/<ranch>/<pasture>/<year>/<measure>.npy`
+
+## Deploying New Pasture Map / Deploying Revised Models
+
+The strategy is build the new database along side the existing databases and then swap the frontend to the new database.
+
+**Note: since the "torch" Q-NAS is down, we only have 2016-2024 scenes available**
+
+The configurations for the databases are in `/var/www/rangesat-biomass/biomass/scripts/`
+
+1. Create a new config by copying existing config.
+
+e.g.
+```bash
+cd /var/www/rangesat-biomass/biomass/scripts/
+cp zumwalt4_config.yaml zumwalt5_config.yaml
+```
+
+2. Then create a directory for the new database
+```bash
+/geodata/nas/rangesat/Zumwalt5/
+```
+
+3. Then create the shapefile needed for the biomass database
+
+```yaml
+# shapefile containing pastures to analyze
+sf_fn: /geodata/nas/rangesat/Zumwalt5/vector_data/Zumwalt2025_w_PastID_Key.shp
+```
+
+Notes on this file:
+also in `/geodata/nas/rangesat/Zumwalt5/vector_data/from_mike/README.md` (non-version controlled)
+
+`Pastures_2025.lpkx` is a 7z archive
+
+To extract archive
+
+```bash
+7z x Pastures_2025.lpkx
+```
+
+Convert to shapefile
+
+```bash
+ogr2ogr -f "ESRI Shapefile" Pastures_2025 commondata/infrastructure.gdb/
+```
+
+The Pastures_2025.lpkx is missing the PastID_Key attribute needed by rangesat.
+
+The `PastID_Key_generation.py` was developed to add this attribute to a new shapefile. The `Zumwalt_2023.shp` is used as a lookup table with one additional manual entry. The locations of the datasets are hardcoded in the script.
+
+
+```bash
+python3 PastID_Key_generation.py
+```
+
+
+A python3 script was developed to add the PastID_Key column to the dataset:
+`/geodata/nas/rangesat/Zumwalt5/vector_data/from_mike/PastID_Key_generation.py` (non-version controlled)
+```python
+from osgeo import ogr, osr
+import sys
+
+# Input shapefiles
+shapefile2023 = "/geodata/nas/rangesat/Zumwalt4/vector_data/Zumwalt2023.shp"
+shapefile2025 = "/geodata/nas/rangesat/Zumwalt5/vector_data/from_mike/Pastures_2025/Pastures_2025.shp"
+output_shapefile = "/geodata/nas/rangesat/Zumwalt5/vector_data/Zumwalt2025_w_PastID_Key.shp"
+
+# Open input shapefiles
+driver = ogr.GetDriverByName("ESRI Shapefile")
+
+# Open 2023 shapefile
+source2023 = driver.Open(shapefile2023, 0)  # Read-only
+if source2023 is None:
+    raise Exception(f"Failed to open {shapefile2023}")
+layer2023 = source2023.GetLayer()
+
+# Open 2025 shapefile
+source2025 = driver.Open(shapefile2025, 0)  # Read-only
+if source2025 is None:
+    raise Exception(f"Failed to open {shapefile2025}")
+layer2025 = source2025.GetLayer()
+
+# Create a lookup dictionary for Property -> MgmtUnit and PASTURE -> PastID_Key
+prop_mgmt = {}
+lookup = {}
+
+for feature in layer2023:
+    prop_mgmt[feature["Property"]] = feature["MgmtUnit"]
+    lookup[feature["PASTURE"]] = feature["PastID_Key"]
+
+# Add custom lookup entry
+lookup['LCR 14'] = 'Midway+LCR 14'
+
+# Create the output shapefile
+if driver.DeleteDataSource(output_shapefile):
+    print(f"Deleted existing {output_shapefile}")
+
+target_ds = driver.CreateDataSource(output_shapefile)
+if target_ds is None:
+    raise Exception(f"Failed to create {output_shapefile}")
+
+# Create the target layer with the same spatial reference and fields as the source layer
+spatial_ref = layer2025.GetSpatialRef()
+target_layer = target_ds.CreateLayer("Zumwalt2025_revised", spatial_ref, ogr.wkbPolygon)
+
+# Copy fields from the source layer
+layer_defn = layer2025.GetLayerDefn()
+for i in range(layer_defn.GetFieldCount()):
+    field_defn = layer_defn.GetFieldDefn(i)
+    target_layer.CreateField(field_defn)
+
+# Add the PastID_Key field explicitly
+pastid_key_field = ogr.FieldDefn("PastID_Key", ogr.OFTString)
+pastid_key_field.SetWidth(50)  # Set a reasonable width
+if target_layer.CreateField(pastid_key_field) != 0:
+    raise Exception("Failed to create PastID_Key field in target shapefile")
+
+target_defn = target_layer.GetLayerDefn()
+
+# Process features and write to the new shapefile
+for feature in layer2025:
+    pasture = feature["PASTURE"]
+    _property = feature["Property"]
+
+    pastid_key_value = None
+    if pasture in lookup:
+        pastid_key_value = lookup[pasture]
+    else:
+        mgmt = prop_mgmt.get(_property, None)
+        if mgmt is not None:
+            pastid_key_value = f'{mgmt}+{pasture}'
+
+    if pastid_key_value is None:
+        raise Exception(f"Could not find pasture {pasture} in lookup")
+
+    # Create and add the updated feature to the target layer
+    new_feature = ogr.Feature(target_defn)
+    new_feature.SetGeometry(feature.GetGeometryRef())
+
+    # Copy existing fields
+    for i in range(target_defn.GetFieldCount()):
+        field_name = target_defn.GetFieldDefn(i).GetNameRef()
+        if field_name != "PastID_Key":
+            new_feature.SetField(field_name, feature.GetField(field_name))
+
+    # Set the new PastID_Key field
+    new_feature.SetField("PastID_Key", pastid_key_value)
+
+    target_layer.CreateFeature(new_feature)
+    new_feature = None  # Clear memory
+
+# Cleanup
+target_ds = None
+source2023 = None
+source2025 = None
+
+print(f"Revised shapefile written to {output_shapefile}")
+```
+
+4. Create the WGS pastures.geojson
+
+```bash
+cd /geodata/nas/rangesat/Zumwalt5/
+ogr2ogr -f "GeoJSON" -t_srs "EPSG:4326" pastures.geojson vector_data/Zumwalt2025_w_PastID_Key.shp
+```
+
+At onepoint we need the shapefiles `PastID_Key` to support `RANCH+PASTURE` and `PASTURE+RANCH`.
+The `reverse_key=True` in the database tells it to use `RANCH+PASTURE`.
+
+**However, the `pastures.geojson` always needs to be `PASTURE+RANCH`**
+
+There is a `swap_pasture_ranch.py` script that swaps it inplace if the keys are RANCH+PASTURE
+
+```python
+import json
+
+fn = 'pastures.geojson'
+with open(fn) as fp:
+    js = json.load(fp)
+
+key_delimiter = '+'
+
+for i, feature in enumerate(js['features']):
+    k = feature['properties']['PastID_Key']
+    k1, k2 = k.split(key_delimiter)
+    js['features'][i]['properties']['PastID_Key'] = f'{k2}{key_delimiter}{k1}'
+    print(k2,k1)
+
+with open(fn, 'w') as fp:
+    json.dump(js, fp)
+```
+
+5. Create config.yaml in database directory
+```bash
+cp ../config.yaml .
+```
+
+update the `config.yaml` as necessary
+
+5. Run `/var/www/rangesat-biomass/biomass/scripts/process_scenes.py` to build the rasters and pasture stats csv files
+
+```bash
+python3 /var/www/rangesat-biomass/biomass/scripts/process_scenes.py zumwalt5_config.yaml /geodata/nas/landsat/zumwalt/
+```
+
+Or you can multiprocess by running process_scenes.py in parallel for each year within different byobu panes.
+
+6. Build the .db database files
+
+```bash
+cd /var/www/rangesat-biomass/database/scripts
+python3 build_sqlite_db.py Zumwalt5
+python3 build_scenemeta_coverage_db.py Zumwalt5
+```
+
+verify they exist
+
+```bash
+ls -ltra /geodata/nas/rangesat/Zumwalt5/analyzed_rasters/*.db
+```
+
+6. Make raster masks
+
+```bash
+cd /var/www/rangesat-biomass/database/scripts
+python3 make_raster_masks.py Zumwalt5 
+```
+
+Then check for files with
+
+```bash
+ls /geodata/nas/rangesat/Zumwalt5/raster_masks/
+```
+
+7. Build GRIDMET Climate database
+
+```bash
+cd /var/www/rangesat-biomass/climates/gridmet
+python3 client.py Zumwalt5 
+```
+
+8. Make `www-data` user and `webgroup` group owner of database
+```bash
+cd /geodata/nas/rangesat
+sudo chown -R www-data:webgroup Zumwalt5  
+sudo chmod -R 775 Zumwalt5
+```
+
+9. Check endpoints
