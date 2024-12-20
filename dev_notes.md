@@ -566,3 +566,8 @@ sudo chmod -R 775 Zumwalt5
 ```
 
 9. Check endpoints
+
+(they look okay to me)
+
+Note: Zumwalt5 has only 6 Ranches
+6_Ranch, Krebs, McClaran, Midway, The_Nature_Conservancy, Triple_Creek 
