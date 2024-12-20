@@ -279,18 +279,10 @@ The configuration of the sites is directory based.
 Would recommend putting sites in `/geodata/nas/rangesat`
 
 Use `du -h` to see available disk usage on the NAS. Ask Luke Sheneman for more space if needed.
-<<<<<<< HEAD
 
 The api provides geojson resources to clients. To accomplish this it needs a WGS `pastures.geojson` in the project root. This json should have the same shapes as the `sf_fn` file used to process the scenes.
 
 There is also a `config.yaml` in the site directory.
-=======
-
-
-The api provides geojson resources to clients. To accomplish this it needs a WGS pastures.geojson in the project root. This json should have the same shapes as the `sf_fn` file used to process the scenes.
-
-**There is also a config.yaml in the site directory.**
->>>>>>> 0280c35f9140f816858c665c8878c87bc6ce19ab
 
 The `config.yaml` also specifies parameters that are used by `database.location.Location` 
 
@@ -326,7 +318,6 @@ edit with `sudo crontab -e`
 
 The climate data is saved as .npy binary files as `<location>/gridmet/<ranch>/<pasture>/<year>/<measure>.npy`
 
-<<<<<<< HEAD
 ## Deploying New Pasture Map / Deploying Revised Models
 
 The strategy is build the new database along side the existing databases and then swap the frontend to the new database.
@@ -575,8 +566,3 @@ sudo chmod -R 775 Zumwalt5
 ```
 
 9. Check endpoints
-=======
-
-### TODO
-
->>>>>>> 0280c35f9140f816858c665c8878c87bc6ce19ab
