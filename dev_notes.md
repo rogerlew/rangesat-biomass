@@ -509,6 +509,28 @@ with open(fn, 'w') as fp:
     json.dump(js, fp)
 ```
 
+The front-end uses the MgmtUnit feature attribute for labeling.
+
+If it isn't present it can be added as such
+```python
+import json
+
+fn = 'pastures.geojson'
+with open(fn) as fp:
+    js = json.load(fp)
+
+key_delimiter = '+'
+
+for i, feature in enumerate(js['features']):
+    k = feature['properties']['PASTURE']
+    js['features'][i]['properties']['MgmtUnit'] = k
+    print(k)
+
+with open(fn, 'w') as fp:
+    json.dump(js, fp)
+
+```
+
 5. Create config.yaml in database directory
 ```bash
 cp ../config.yaml .
@@ -577,3 +599,4 @@ Note: Zumwalt5 has only 6 Ranches:
 - Midway
 - The_Nature_Conservancy
 - Triple_Creek 
+
