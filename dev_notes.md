@@ -28,7 +28,7 @@ Store of raw Landsat Collection 1 scenes from earth explorer
 - hostname is `torch.aa.uidaho.edu`
 - share name is `bunchgrass`
 - mounted to `/geodata/torch-landsat/`
-- Not currently connected or available. (not sure why it went offline 12/14/2023)
+- Not currently connected or available (offline as of 12/14/2023).
 - Earth Explorer retired Collection 1 end of 2022
 
 
@@ -43,7 +43,13 @@ in `/geodata/nas/landsat/zumwalt/<year>`
 
 - Done manually to visual inspect cloud cover on the Zumwalt
 - Just acquire 043208 scenes. These fully cover the Zumwalt area. There are row/paths that intersect the Zumwalt but if you get both for the same date the api can get confused.
-- There is some alpha support for merging row/paths from the same satellite and date.
+- There is no true merging of same-date row/paths. The API only lets you filter by multiple rowpaths (e.g., `rowpath=042028 043028`) but will still pick a single product_id when it needs one.
+
+##### Row/path mixing gotchas
+- If you process multiple WRS paths/rows for the same date, the API will still return a single product_id for “latest/closest-date” lookups; whichever CSV happens to be found first wins.
+- Default Zumwalt API rowpath filters are `042028 043028` for listing and `042028` for most raster/processing routes, so you must pass `rowpath=` explicitly when you want other paths.
+- The current `database/scripts/build_sqlite_db.py` skips Zumwalt CSVs containing `042029`; remove that guard before rebuilding if you need R029 scenes in the DB.
+- There is no on-the-fly mosaic/merge of overlapping paths; if you need mosaicked same-date coverage, build that before ingest.
 
 #### 2. Download scenes to server
 
@@ -599,4 +605,3 @@ Note: Zumwalt5 has only 6 Ranches:
 - Midway
 - The_Nature_Conservancy
 - Triple_Creek 
-
