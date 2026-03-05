@@ -41,7 +41,7 @@ _var_meta = {
     GridMetVariable.BurningIndex: ('bi', 'burning_index_g'),
 }
 
-# http://thredds.northwestknowledge.net:8080/thredds/ncss/MET/bi/bi_2019.nc?var=burning_index_g
+# https://thredds.northwestknowledge.net/thredds/ncss/MET/bi/bi_2019.nc?var=burning_index_g
 
 def nc_extract(fn, locations):
     rds = RasterDatasetInterpolator(fn, proj='EPSG:4326')
@@ -66,7 +66,7 @@ def _retrieve(gridvariable: GridMetVariable, bbox, year):
     assert east > west
     assert south < north
 
-    url = 'http://thredds.northwestknowledge.net:8080/thredds/ncss/MET/{abbrv}/{abbrv}_{year}.nc?' \
+    url = 'https://thredds.northwestknowledge.net/thredds/ncss/MET/{abbrv}/{abbrv}_{year}.nc?' \
           'var={variable_name}&' \
           'north={north}&west={west}&east={east}&south={south}&' \
           'disableProjSubset=on&horizStride=1&' \
