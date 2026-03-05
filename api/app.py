@@ -1650,6 +1650,9 @@ def multiyear_pasturestats(location):
                                                      start_date=start_date, end_date=end_date, agg_func=agg_func,
                                                      key_delimiter=_location.key_delimiter)
 
+                if not data:
+                    return _handle_pasturestat_request(data, csv, units=units, drop=drop, additions=additions)
+
                 ranch = ranch.replace("'", "~").replace(' ', '_')
                 if pasture is None:
                     pasture = _location.representative_pasture(ranch)

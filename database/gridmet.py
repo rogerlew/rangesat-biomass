@@ -45,6 +45,8 @@ def load_gridmet_single_year(directory, year, units='SI', wy=False):
         else:
             d[var] = None
 
+    d['dates'] = None
+    d['cum_pr'] = None
     if d['pr'] is not None:
         d['dates'] = [str(date(int(year), 1, 1) + timedelta(i)) for i, _ in enumerate(d['pr'])]
         d['cum_pr'] = list(np.cumsum(d['pr']))
@@ -66,7 +68,7 @@ def load_gridmet_single_year(directory, year, units='SI', wy=False):
     if wy:
         dp = load_gridmet_single_year(directory, year-1, units=units)
 
-        if d['dates'] is not None:
+        if d.get('dates') is not None:
             for i, _date in enumerate(d['dates']):
                 year, month, day = [int(v) for v in _date.split('-')]
                 if month == 10 and day == 1:
@@ -77,7 +79,7 @@ def load_gridmet_single_year(directory, year, units='SI', wy=False):
                     continue
                 d[var] = d[var][:i]
 
-        if dp['dates'] is not None:
+        if dp.get('dates') is not None:
             for i, _date in enumerate(dp['dates']):
                 year, month, day = [int(v) for v in _date.split('-')]
                 if month == 10 and day == 1:
@@ -120,7 +122,17 @@ def load_gridmet_single_year_monthly(directory, year, units='SI', verbose=True):
         d['dates'] = [str(date(int(year), 1, 1) + timedelta(i)) for i, _ in enumerate(d['pr'])]
         d['cum_pr'] = list(np.cumsum(d['pr']))
 
-    _dates = [date(int(year), 1, 1) + timedelta(i) for i, _ in enumerate(d['pr'])]
+    series_for_dates = d['pr']
+    if series_for_dates is None:
+        for var in _variables:
+            if d[var] is not None:
+                series_for_dates = d[var]
+                break
+
+    if series_for_dates is None:
+        _dates = []
+    else:
+        _dates = [date(int(year), 1, 1) + timedelta(i) for i, _ in enumerate(series_for_dates)]
 
     _d = {}
     for var in _variables:
@@ -132,6 +144,9 @@ def load_gridmet_single_year_monthly(directory, year, units='SI', verbose=True):
         _d[var] = []
         for mo in range(1, 13):
             if d[var] is None:
+                _d[var].append(None)
+                continue
+            if not _dates:
                 _d[var].append(None)
                 continue
 
